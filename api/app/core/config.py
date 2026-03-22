@@ -1,0 +1,22 @@
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    DATABASE_URL: str = "postgresql+asyncpg://cadence:cadence@localhost:5432/cadence"
+    REDIS_URL: str = "redis://localhost:6379"
+    SECRET_KEY: str = "change-me"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 1 week
+
+    SPOTIFY_CLIENT_ID: str = ""
+    SPOTIFY_CLIENT_SECRET: str = ""
+    SPOTIFY_REDIRECT_URI: str = "http://localhost:8000/auth/spotify/callback"
+
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+
+    FRONTEND_URL: str = "http://localhost:3000"
+
+    model_config = {"env_file": ".env", "extra": "ignore"}
+
+
+settings = Settings()
