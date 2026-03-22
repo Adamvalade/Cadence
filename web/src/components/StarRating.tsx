@@ -24,8 +24,9 @@ export default function StarRating({
   size = "md",
   readonly = false,
 }: StarRatingProps) {
-  const fullStars = Math.floor(value / 2);
-  const hasHalf = value % 2 === 1;
+  const displayValue = Number.isInteger(value) ? value : Math.round(value * 10) / 10;
+  const fullStars = Math.floor(displayValue / 2);
+  const hasHalf = displayValue % 2 >= 0.5;
   const totalStars = max / 2;
 
   if (readonly) {
@@ -44,7 +45,7 @@ export default function StarRating({
             )}
           />
         ))}
-        <span className="ml-1.5 text-sm font-medium tabular-nums">{value}/{max}</span>
+        <span className="ml-1.5 text-sm font-medium tabular-nums">{displayValue}/{max}</span>
       </div>
     );
   }
@@ -53,7 +54,6 @@ export default function StarRating({
     <div className="flex items-center gap-1">
       {Array.from({ length: max }, (_, i) => {
         const ratingValue = i + 1;
-        const starIndex = Math.floor(i / 2);
         const isSecondHalf = i % 2 === 1;
 
         return (

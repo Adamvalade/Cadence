@@ -1,21 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { Music, Loader2 } from "lucide-react";
+import { Music } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import StarRating from "@/components/StarRating";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import type { Album } from "@/lib/types";
+import type { Album, Review } from "@/lib/types";
 
 export default function ReviewPage() {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("edit");
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
   const [album, setAlbum] = useState<Album | null>(null);
@@ -28,17 +32,31 @@ export default function ReviewPage() {
 
   useEffect(() => {
     if (!id) return;
-    api.get<Album>(`/albums/${id}`)
-      .then(setAlbum)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [id]);
+    const load = async () => {
+      try {
+        const albumData = await api.get<Album>(`/albums/${id}`);
+        setAlbum(albumData);
+
+        if (editId) {
+          const review = await api.get<Review>(`/reviews/${editId}`);
+          setRating(review.rating);
+          setBody(review.body || "");
+          setIsRelisten(review.is_relisten);
+        }
+      } catch {
+        // album or review not found
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [id, editId]);
 
   useEffect(() => {
-    if (!user && !loading) {
+    if (!user && !authLoading) {
       router.push("/auth/login");
     }
-  }, [user, loading, router]);
+  }, [user, authLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,12 +67,20 @@ export default function ReviewPage() {
     setError("");
     setSubmitting(true);
     try {
-      await api.post("/reviews", {
-        album_id: id,
-        rating,
-        body: body || null,
-        is_relisten: isRelisten,
-      });
+      if (editId) {
+        await api.patch(`/reviews/${editId}`, {
+          rating,
+          body: body || null,
+          is_relisten: isRelisten,
+        });
+      } else {
+        await api.post("/reviews", {
+          album_id: id,
+          rating,
+          body: body || null,
+          is_relisten: isRelisten,
+        });
+      }
       router.push(`/album/${id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit review");
@@ -65,8 +91,23 @@ export default function ReviewPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-24">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="max-w-xl mx-auto px-4 py-8">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-4 mb-2">
+              <Skeleton className="w-16 h-16 rounded-md" />
+              <div className="space-y-2">
+                <Skeleton className="h-5 w-32" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -130,12 +171,10 @@ export default function ReviewPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 id="relisten"
                 checked={isRelisten}
-                onChange={(e) => setIsRelisten(e.target.checked)}
-                className="rounded border-input"
+                onCheckedChange={(checked) => setIsRelisten(checked === true)}
               />
               <Label htmlFor="relisten" className="text-sm cursor-pointer">
                 This is a relisten
@@ -143,7 +182,7 @@ export default function ReviewPage() {
             </div>
 
             <Button type="submit" className="w-full" disabled={submitting || rating === 0}>
-              {submitting ? "Submitting..." : "Submit Review"}
+              {submitting ? "Submitting..." : editId ? "Update Review" : "Submit Review"}
             </Button>
           </form>
         </CardContent>

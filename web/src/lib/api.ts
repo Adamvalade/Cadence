@@ -3,7 +3,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 type FetchOptions = RequestInit & { params?: Record<string, string> };
 
 async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T> {
-  const { params, ...init } = options;
+  const { params, headers: customHeaders, ...restInit } = options;
 
   let url = `${API_BASE}${path}`;
   if (params) {
@@ -12,12 +12,12 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T>
   }
 
   const res = await fetch(url, {
+    ...restInit,
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      ...init.headers,
+      ...(customHeaders as Record<string, string>),
     },
-    ...init,
   });
 
   if (!res.ok) {

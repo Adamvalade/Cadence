@@ -129,26 +129,45 @@ async def delete_review(
 
 
 @router.get("", response_model=list[ReviewResponse])
-async def get_user_reviews(
-    username: str = Query(...),
+async def get_reviews(
+    username: str | None = Query(default=None),
+    album_id: str | None = Query(default=None),
     limit: int = Query(default=20, le=50),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
+    current_user: User | None = Depends(get_optional_user),
 ):
-    user_result = await db.execute(select(User).where(User.username == username))
-    user = user_result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not username and not album_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provide username or album_id")
+
+    query = select(Review)
+
+    if username:
+        user_result = await db.execute(select(User).where(User.username == username))
+        user = user_result.scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        query = query.where(Review.user_id == user.id)
+
+    if album_id:
+        query = query.where(Review.album_id == uuid.UUID(album_id))
 
     result = await db.execute(
-        select(Review)
-        .where(Review.user_id == user.id)
-        .order_by(Review.created_at.desc())
-        .limit(limit)
-        .offset(offset)
+        query.order_by(Review.created_at.desc()).limit(limit).offset(offset)
     )
     reviews = result.scalars().all()
-    return [_review_response(r) for r in reviews]
+
+    items = []
+    for r in reviews:
+        like_count = (await db.execute(select(func.count()).where(Like.review_id == r.id))).scalar() or 0
+        liked_by_me = False
+        if current_user:
+            liked = await db.execute(
+                select(Like).where(Like.review_id == r.id, Like.user_id == current_user.id)
+            )
+            liked_by_me = liked.scalar_one_or_none() is not None
+        items.append(_review_response(r, like_count=like_count, liked_by_me=liked_by_me))
+    return items
 
 
 @router.post("/{review_id}/like", status_code=status.HTTP_201_CREATED)

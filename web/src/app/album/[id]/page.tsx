@@ -8,6 +8,7 @@ import { Music, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import StarRating from "@/components/StarRating";
 import ReviewCard from "@/components/ReviewCard";
 import { api } from "@/lib/api";
@@ -25,20 +26,16 @@ export default function AlbumDetailPage() {
     if (!id) return;
     const load = async () => {
       try {
-        const [albumData, reviewsData] = await Promise.all([
-          api.get<Album>(`/albums/${id}`),
-          api.get<Review[]>("/reviews", { username: "", album_id: id }),
-        ]);
+        const albumData = await api.get<Album>(`/albums/${id}`);
         setAlbum(albumData);
-        setReviews(reviewsData);
-      } catch {
-        // try just the album
         try {
-          const albumData = await api.get<Album>(`/albums/${id}`);
-          setAlbum(albumData);
+          const reviewsData = await api.get<Review[]>("/reviews", { album_id: id });
+          setReviews(reviewsData);
         } catch {
-          // album not found
+          setReviews([]);
         }
+      } catch {
+        setAlbum(null);
       } finally {
         setLoading(false);
       }
@@ -46,10 +43,28 @@ export default function AlbumDetailPage() {
     load();
   }, [id]);
 
+  const handleDeleteReview = (reviewId: string) => {
+    setReviews((prev) => prev.filter((r) => r.id !== reviewId));
+    if (album) {
+      setAlbum({ ...album, review_count: album.review_count - 1 });
+    }
+  };
+
   if (loading) {
     return (
-      <div className="flex justify-center py-24">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="flex flex-col md:flex-row gap-8">
+          <Skeleton className="w-64 h-64 rounded-lg shrink-0 mx-auto md:mx-0" />
+          <div className="flex-1 space-y-4">
+            <Skeleton className="h-9 w-64" />
+            <Skeleton className="h-5 w-40" />
+            <div className="flex gap-2">
+              <Skeleton className="h-6 w-16" />
+              <Skeleton className="h-6 w-20" />
+            </div>
+            <Skeleton className="h-8 w-48" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -101,7 +116,7 @@ export default function AlbumDetailPage() {
 
           {album.avg_rating != null && (
             <div className="space-y-1">
-              <StarRating value={Math.round(album.avg_rating)} size="lg" readonly />
+              <StarRating value={album.avg_rating} size="lg" readonly />
               <p className="text-sm text-muted-foreground">
                 {album.review_count} {album.review_count === 1 ? "review" : "reviews"}
               </p>
@@ -123,7 +138,12 @@ export default function AlbumDetailPage() {
         ) : (
           <div className="space-y-4">
             {reviews.map((review) => (
-              <ReviewCard key={review.id} review={review} showAlbum={false} />
+              <ReviewCard
+                key={review.id}
+                review={review}
+                showAlbum={false}
+                onDelete={handleDeleteReview}
+              />
             ))}
           </div>
         )}

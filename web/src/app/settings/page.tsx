@@ -21,6 +21,7 @@ export default function SettingsPage() {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (authLoading) return;
@@ -28,17 +29,20 @@ export default function SettingsPage() {
       router.push("/auth/login");
       return;
     }
-    api.get<UserProfile>(`/users/${user.username}`).then((profile) => {
-      setDisplayName(profile.display_name || "");
-      setBio(profile.bio || "");
-      setAvatarUrl(profile.avatar_url || "");
-    });
+    api.get<UserProfile>(`/users/${user.username}`)
+      .then((profile) => {
+        setDisplayName(profile.display_name || "");
+        setBio(profile.bio || "");
+        setAvatarUrl(profile.avatar_url || "");
+      })
+      .catch(() => setError("Failed to load profile"));
   }, [user, authLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setSaved(false);
+    setError("");
     try {
       await api.patch("/users/me", {
         display_name: displayName,
@@ -48,8 +52,8 @@ export default function SettingsPage() {
       await refresh();
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-    } catch {
-      // handle error
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save changes");
     } finally {
       setSaving(false);
     }
@@ -72,6 +76,11 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">
+                {error}
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="displayName">Display name</Label>
               <Input

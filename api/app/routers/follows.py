@@ -56,6 +56,19 @@ async def unfollow_user(
     await db.commit()
 
 
+@router.get("/users/{user_id}/follow/status")
+async def follow_status(
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    target_id = uuid.UUID(user_id)
+    result = await db.execute(
+        select(Follow).where(Follow.follower_id == current_user.id, Follow.following_id == target_id)
+    )
+    return {"following": result.scalar_one_or_none() is not None}
+
+
 @router.get("/users/{username}/followers", response_model=list[UserBrief])
 async def get_followers(
     username: str,

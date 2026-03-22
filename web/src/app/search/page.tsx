@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { api } from "@/lib/api";
-import type { AlbumSearchResult } from "@/lib/types";
+import type { Album, AlbumSearchResult } from "@/lib/types";
 
 export default function SearchPage() {
   const [query, setQuery] = useState("");
@@ -34,7 +34,7 @@ export default function SearchPage() {
 
   const handleImport = async (spotifyId: string) => {
     try {
-      const album = await api.post<{ id: string }>(`/albums/import/${spotifyId}`);
+      const album = await api.post<Album>(`/albums/import/${spotifyId}`);
       router.push(`/album/${album.id}`);
     } catch {
       // handle error

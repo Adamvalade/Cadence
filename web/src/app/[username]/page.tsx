@@ -7,11 +7,31 @@ import { Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ReviewCard from "@/components/ReviewCard";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { Review, UserList, UserProfile } from "@/lib/types";
+
+function ProfileSkeleton() {
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-8">
+      <div className="flex items-start gap-6">
+        <Skeleton className="h-20 w-20 rounded-full" />
+        <div className="flex-1 space-y-3">
+          <Skeleton className="h-7 w-48" />
+          <Skeleton className="h-4 w-32" />
+          <div className="flex gap-4">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-4 w-20" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function ProfilePage() {
   const { username } = useParams<{ username: string }>();
@@ -36,14 +56,23 @@ export default function ProfilePage() {
         ]);
         if (reviewsData.status === "fulfilled") setReviews(reviewsData.value);
         if (listsData.status === "fulfilled") setLists(listsData.value);
+
+        if (currentUser && currentUser.username !== username) {
+          try {
+            const status = await api.get<{ following: boolean }>(`/users/${profileData.id}/follow/status`);
+            setIsFollowing(status.following);
+          } catch {
+            /* not authenticated */
+          }
+        }
       } catch {
-        // user not found
+        setProfile(null);
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, [username]);
+  }, [username, currentUser]);
 
   const handleFollow = async () => {
     if (!profile) return;
@@ -62,18 +91,22 @@ export default function ProfilePage() {
     }
   };
 
+  const handleDeleteReview = (reviewId: string) => {
+    setReviews((prev) => prev.filter((r) => r.id !== reviewId));
+    if (profile) {
+      setProfile({ ...profile, review_count: profile.review_count - 1 });
+    }
+  };
+
   if (loading) {
-    return (
-      <div className="flex justify-center py-24">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <ProfileSkeleton />;
   }
 
   if (!profile) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-24 text-center">
         <h1 className="text-2xl font-bold">User not found</h1>
+        <p className="text-muted-foreground mt-2">This user doesn&apos;t exist or couldn&apos;t be loaded.</p>
       </div>
     );
   }
@@ -130,7 +163,7 @@ export default function ProfilePage() {
             <p className="text-muted-foreground text-center py-8">No reviews yet.</p>
           ) : (
             reviews.map((review) => (
-              <ReviewCard key={review.id} review={review} />
+              <ReviewCard key={review.id} review={review} onDelete={handleDeleteReview} />
             ))
           )}
         </TabsContent>

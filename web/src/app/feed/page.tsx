@@ -4,10 +4,29 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import ReviewCard from "@/components/ReviewCard";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { FeedResponse, Review } from "@/lib/types";
+
+function FeedSkeleton() {
+  return (
+    <div className="space-y-4">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="border rounded-lg p-4 flex gap-4">
+          <Skeleton className="w-20 h-20 rounded-md shrink-0" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-3 w-48" />
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-3 w-full" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function FeedPage() {
   const { user, loading: authLoading } = useAuth();
@@ -17,11 +36,13 @@ export default function FeedPage() {
   const [hasMore, setHasMore] = useState(false);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState("");
 
   const loadFeed = useCallback(async (nextCursor?: string | null) => {
     const isLoadMore = !!nextCursor;
     if (isLoadMore) setLoadingMore(true);
     else setLoading(true);
+    setError("");
 
     try {
       const params: Record<string, string> = {};
@@ -35,8 +56,8 @@ export default function FeedPage() {
       }
       setHasMore(data.has_more);
       setCursor(data.next_cursor);
-    } catch {
-      // handle error
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load feed");
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -52,10 +73,15 @@ export default function FeedPage() {
     loadFeed();
   }, [user, authLoading, router, loadFeed]);
 
+  const handleDeleteReview = (reviewId: string) => {
+    setReviews((prev) => prev.filter((r) => r.id !== reviewId));
+  };
+
   if (authLoading || loading) {
     return (
-      <div className="flex justify-center py-24">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="max-w-2xl mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold mb-6">Your Feed</h1>
+        <FeedSkeleton />
       </div>
     );
   }
@@ -64,7 +90,13 @@ export default function FeedPage() {
     <div className="max-w-2xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-6">Your Feed</h1>
 
-      {reviews.length === 0 ? (
+      {error ? (
+        <div className="text-center py-12 space-y-3">
+          <p className="text-destructive font-medium">Something went wrong</p>
+          <p className="text-sm text-muted-foreground">{error}</p>
+          <Button variant="outline" onClick={() => loadFeed()}>Try again</Button>
+        </div>
+      ) : reviews.length === 0 ? (
         <div className="text-center py-12 space-y-3">
           <p className="text-muted-foreground">Your feed is empty.</p>
           <p className="text-sm text-muted-foreground">
@@ -74,7 +106,7 @@ export default function FeedPage() {
       ) : (
         <div className="space-y-4">
           {reviews.map((review) => (
-            <ReviewCard key={review.id} review={review} />
+            <ReviewCard key={review.id} review={review} onDelete={handleDeleteReview} />
           ))}
 
           {hasMore && (
