@@ -4,13 +4,14 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Music, Loader2 } from "lucide-react";
+import { Music } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import StarRating from "@/components/StarRating";
 import ReviewCard from "@/components/ReviewCard";
+import ListenStatusButton from "@/components/ListenStatusButton";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { Album, Review } from "@/lib/types";
@@ -20,6 +21,7 @@ export default function AlbumDetailPage() {
   const { user } = useAuth();
   const [album, setAlbum] = useState<Album | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [listenStatus, setListenStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,12 +30,13 @@ export default function AlbumDetailPage() {
       try {
         const albumData = await api.get<Album>(`/albums/${id}`);
         setAlbum(albumData);
-        try {
-          const reviewsData = await api.get<Review[]>("/reviews", { album_id: id });
-          setReviews(reviewsData);
-        } catch {
-          setReviews([]);
-        }
+
+        const [reviewsResult, statusResult] = await Promise.allSettled([
+          api.get<Review[]>("/reviews", { album_id: id }),
+          api.get<{ status: string | null }>(`/listen-status/${id}`),
+        ]);
+        if (reviewsResult.status === "fulfilled") setReviews(reviewsResult.value);
+        if (statusResult.status === "fulfilled") setListenStatus(statusResult.value.status);
       } catch {
         setAlbum(null);
       } finally {
@@ -124,7 +127,13 @@ export default function AlbumDetailPage() {
           )}
 
           {user && (
-            <Button render={<Link href={`/album/${id}/review`} />}>Log this album</Button>
+            <div className="flex items-center gap-2">
+              <Button render={<Link href={`/album/${id}/review`} />}>Log this album</Button>
+              <ListenStatusButton
+                albumId={id}
+                initialStatus={listenStatus as "want_to_listen" | "listening" | "listened" | null}
+              />
+            </div>
           )}
         </div>
       </div>

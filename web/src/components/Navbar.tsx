@@ -35,6 +35,9 @@ export default function Navbar() {
             <Search className="h-4 w-4" />
             Search
           </Link>
+          <Link href="/discover" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            Discover
+          </Link>
           {user && (
             <Link href="/feed" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               Feed

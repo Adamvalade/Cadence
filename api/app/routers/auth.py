@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.deps import get_current_user, get_db
+from app.core.rate_limit import auth_limiter
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User
 from app.schemas.auth import AuthResponse, LoginRequest, RegisterRequest, UserBrief
@@ -39,7 +40,14 @@ if settings.GOOGLE_CLIENT_ID:
 
 def _set_token_cookie(response: Response, user_id: str) -> None:
     token = create_access_token(user_id)
-    response.set_cookie("access_token", token, httponly=True, samesite="lax", max_age=60 * 60 * 24 * 7)
+    response.set_cookie(
+        "access_token",
+        token,
+        httponly=True,
+        samesite="lax",
+        secure=settings.cookie_secure,
+        max_age=60 * 60 * 24 * 7,
+    )
 
 
 def _user_brief(user: User) -> UserBrief:
@@ -56,7 +64,8 @@ def _user_brief(user: User) -> UserBrief:
 
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
-async def register(body: RegisterRequest, response: Response, db: AsyncSession = Depends(get_db)):
+async def register(request: Request, body: RegisterRequest, response: Response, db: AsyncSession = Depends(get_db)):
+    auth_limiter.check(request)
     existing = await db.execute(
         select(User).where((User.email == body.email) | (User.username == body.username))
     )
@@ -78,7 +87,8 @@ async def register(body: RegisterRequest, response: Response, db: AsyncSession =
 
 
 @router.post("/login", response_model=AuthResponse)
-async def login(body: LoginRequest, response: Response, db: AsyncSession = Depends(get_db)):
+async def login(request: Request, body: LoginRequest, response: Response, db: AsyncSession = Depends(get_db)):
+    auth_limiter.check(request)
     result = await db.execute(select(User).where(User.email == body.email))
     user = result.scalar_one_or_none()
 

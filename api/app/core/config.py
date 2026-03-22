@@ -16,6 +16,18 @@ class Settings(BaseSettings):
 
     FRONTEND_URL: str = "http://localhost:3000"
 
+    ENVIRONMENT: str = "development"
+    DB_POOL_SIZE: int = 10
+    DB_MAX_OVERFLOW: int = 20
+
+    @property
+    def is_production(self) -> bool:
+        return self.ENVIRONMENT == "production"
+
+    @property
+    def cookie_secure(self) -> bool:
+        return self.is_production
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 
