@@ -45,13 +45,13 @@ export default function Navbar() {
         <div className="flex items-center gap-3">
           {user ? (
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={user.avatar_url || undefined} alt={user.username} />
-                    <AvatarFallback>{user.username[0].toUpperCase()}</AvatarFallback>
-                  </Avatar>
-                </Button>
+              <DropdownMenuTrigger
+                render={<Button variant="ghost" className="relative h-8 w-8 rounded-full" />}
+              >
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={user.avatar_url || undefined} alt={user.username} />
+                  <AvatarFallback>{user.username[0].toUpperCase()}</AvatarFallback>
+                </Avatar>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem onClick={() => router.push(`/${user.username}`)}>
@@ -70,12 +70,8 @@ export default function Navbar() {
             </DropdownMenu>
           ) : (
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/auth/login">Log in</Link>
-              </Button>
-              <Button size="sm" asChild>
-                <Link href="/auth/register">Sign up</Link>
-              </Button>
+              <Button variant="ghost" size="sm" render={<Link href="/auth/login" />}>Log in</Button>
+              <Button size="sm" render={<Link href="/auth/register" />}>Sign up</Button>
             </div>
           )}
         </div>

@@ -112,9 +112,7 @@ export default function ProfilePage() {
             </Button>
           )}
           {isOwnProfile && (
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/settings">Edit profile</Link>
-            </Button>
+            <Button variant="outline" size="sm" render={<Link href="/settings" />}>Edit profile</Button>
           )}
         </div>
       </div>

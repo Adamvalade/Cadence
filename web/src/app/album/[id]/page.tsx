@@ -109,9 +109,7 @@ export default function AlbumDetailPage() {
           )}
 
           {user && (
-            <Button asChild>
-              <Link href={`/album/${id}/review`}>Log this album</Link>
-            </Button>
+            <Button render={<Link href={`/album/${id}/review`} />}>Log this album</Button>
           )}
         </div>
       </div>

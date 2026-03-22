@@ -20,21 +20,13 @@ export default function HomePage() {
         </p>
         {user ? (
           <div className="flex gap-3">
-            <Button size="lg" asChild>
-              <Link href="/feed">Go to Feed</Link>
-            </Button>
-            <Button size="lg" variant="outline" asChild>
-              <Link href="/search">Search Albums</Link>
-            </Button>
+            <Button size="lg" render={<Link href="/feed" />}>Go to Feed</Button>
+            <Button size="lg" variant="outline" render={<Link href="/search" />}>Search Albums</Button>
           </div>
         ) : (
           <div className="flex gap-3">
-            <Button size="lg" asChild>
-              <Link href="/auth/register">Get Started</Link>
-            </Button>
-            <Button size="lg" variant="outline" asChild>
-              <Link href="/auth/login">Log In</Link>
-            </Button>
+            <Button size="lg" render={<Link href="/auth/register" />}>Get Started</Button>
+            <Button size="lg" variant="outline" render={<Link href="/auth/login" />}>Log In</Button>
           </div>
         )}
       </section>
