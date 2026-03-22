@@ -1,13 +1,58 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+import secrets
+
+from authlib.integrations.starlette_client import OAuth
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.deps import get_current_user, get_db
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User
 from app.schemas.auth import AuthResponse, LoginRequest, RegisterRequest, UserBrief
 
 router = APIRouter()
+
+oauth = OAuth()
+
+if settings.SPOTIFY_CLIENT_ID:
+    oauth.register(
+        name="spotify",
+        client_id=settings.SPOTIFY_CLIENT_ID,
+        client_secret=settings.SPOTIFY_CLIENT_SECRET,
+        authorize_url="https://accounts.spotify.com/authorize",
+        access_token_url="https://accounts.spotify.com/api/token",
+        api_base_url="https://api.spotify.com/v1/",
+        client_kwargs={"scope": "user-read-email user-read-private"},
+    )
+
+if settings.GOOGLE_CLIENT_ID:
+    oauth.register(
+        name="google",
+        client_id=settings.GOOGLE_CLIENT_ID,
+        client_secret=settings.GOOGLE_CLIENT_SECRET,
+        server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+        client_kwargs={"scope": "openid email profile"},
+    )
+
+
+def _set_token_cookie(response: Response, user_id: str) -> None:
+    token = create_access_token(user_id)
+    response.set_cookie("access_token", token, httponly=True, samesite="lax", max_age=60 * 60 * 24 * 7)
+
+
+def _user_brief(user: User) -> UserBrief:
+    return UserBrief(
+        id=str(user.id),
+        email=user.email,
+        username=user.username,
+        display_name=user.display_name,
+        avatar_url=user.avatar_url,
+    )
+
+
+# ── Email/Password ──────────────────────────────────────────────────
 
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
@@ -28,19 +73,8 @@ async def register(body: RegisterRequest, response: Response, db: AsyncSession =
     await db.commit()
     await db.refresh(user)
 
-    token = create_access_token(str(user.id))
-    response.set_cookie("access_token", token, httponly=True, samesite="lax", max_age=60 * 60 * 24 * 7)
-
-    return AuthResponse(
-        message="Registration successful",
-        user=UserBrief(
-            id=str(user.id),
-            email=user.email,
-            username=user.username,
-            display_name=user.display_name,
-            avatar_url=user.avatar_url,
-        ),
-    )
+    _set_token_cookie(response, str(user.id))
+    return AuthResponse(message="Registration successful", user=_user_brief(user))
 
 
 @router.post("/login", response_model=AuthResponse)
@@ -51,19 +85,8 @@ async def login(body: LoginRequest, response: Response, db: AsyncSession = Depen
     if not user or not user.password_hash or not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
-    token = create_access_token(str(user.id))
-    response.set_cookie("access_token", token, httponly=True, samesite="lax", max_age=60 * 60 * 24 * 7)
-
-    return AuthResponse(
-        message="Login successful",
-        user=UserBrief(
-            id=str(user.id),
-            email=user.email,
-            username=user.username,
-            display_name=user.display_name,
-            avatar_url=user.avatar_url,
-        ),
-    )
+    _set_token_cookie(response, str(user.id))
+    return AuthResponse(message="Login successful", user=_user_brief(user))
 
 
 @router.post("/logout")
@@ -74,10 +97,122 @@ async def logout(response: Response):
 
 @router.get("/me", response_model=UserBrief)
 async def me(current_user: User = Depends(get_current_user)):
-    return UserBrief(
-        id=str(current_user.id),
-        email=current_user.email,
-        username=current_user.username,
-        display_name=current_user.display_name,
-        avatar_url=current_user.avatar_url,
-    )
+    return _user_brief(current_user)
+
+
+# ── Spotify OAuth ────────────────────────────────────────────────────
+
+
+@router.get("/spotify")
+async def spotify_login(request: Request):
+    if not settings.SPOTIFY_CLIENT_ID:
+        raise HTTPException(status_code=501, detail="Spotify OAuth not configured")
+    redirect_uri = settings.SPOTIFY_REDIRECT_URI
+    return await oauth.spotify.authorize_redirect(request, redirect_uri)
+
+
+@router.get("/spotify/callback")
+async def spotify_callback(request: Request, db: AsyncSession = Depends(get_db)):
+    if not settings.SPOTIFY_CLIENT_ID:
+        raise HTTPException(status_code=501, detail="Spotify OAuth not configured")
+
+    token_data = await oauth.spotify.authorize_access_token(request)
+    resp = await oauth.spotify.get("me", token=token_data)
+    profile = resp.json()
+
+    spotify_id = profile["id"]
+    email = profile.get("email")
+    display_name = profile.get("display_name", "")
+    avatar_url = None
+    images = profile.get("images", [])
+    if images:
+        avatar_url = images[0].get("url")
+
+    result = await db.execute(select(User).where(User.spotify_id == spotify_id))
+    user = result.scalar_one_or_none()
+
+    if not user and email:
+        result = await db.execute(select(User).where(User.email == email))
+        user = result.scalar_one_or_none()
+        if user:
+            user.spotify_id = spotify_id
+
+    if not user:
+        username = _generate_username(display_name or spotify_id)
+        existing = await db.execute(select(User).where(User.username == username))
+        if existing.scalar_one_or_none():
+            username = f"{username}_{secrets.token_hex(3)}"
+
+        user = User(
+            email=email or f"{spotify_id}@spotify.oauth",
+            username=username,
+            display_name=display_name or username,
+            spotify_id=spotify_id,
+            avatar_url=avatar_url,
+        )
+        db.add(user)
+
+    if avatar_url and not user.avatar_url:
+        user.avatar_url = avatar_url
+
+    await db.commit()
+    await db.refresh(user)
+
+    redirect = RedirectResponse(url=f"{settings.FRONTEND_URL}/auth/callback")
+    _set_token_cookie(redirect, str(user.id))
+    return redirect
+
+
+# ── Google OAuth ─────────────────────────────────────────────────────
+
+
+@router.get("/google")
+async def google_login(request: Request):
+    if not settings.GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=501, detail="Google OAuth not configured")
+    redirect_uri = f"{request.base_url}auth/google/callback"
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+
+@router.get("/google/callback")
+async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
+    if not settings.GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=501, detail="Google OAuth not configured")
+
+    token_data = await oauth.google.authorize_access_token(request)
+    id_info = token_data.get("userinfo", {})
+
+    email = id_info.get("email")
+    if not email:
+        raise HTTPException(status_code=400, detail="Email not provided by Google")
+
+    name = id_info.get("name", "")
+    avatar_url = id_info.get("picture")
+
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        username = _generate_username(name or email.split("@")[0])
+        existing = await db.execute(select(User).where(User.username == username))
+        if existing.scalar_one_or_none():
+            username = f"{username}_{secrets.token_hex(3)}"
+
+        user = User(
+            email=email,
+            username=username,
+            display_name=name or username,
+            avatar_url=avatar_url,
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+    redirect = RedirectResponse(url=f"{settings.FRONTEND_URL}/auth/callback")
+    _set_token_cookie(redirect, str(user.id))
+    return redirect
+
+
+def _generate_username(source: str) -> str:
+    clean = "".join(c if c.isalnum() or c == "_" else "" for c in source.lower().replace(" ", "_"))
+    return (clean or "user")[:25]
