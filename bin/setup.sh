@@ -40,12 +40,35 @@ if [ ! -f "$API_DIR/.env" ]; then
 fi
 
 echo "  Running database migrations..."
-alembic upgrade head
+set +e
+_migrate_out="$(alembic upgrade head 2>&1)"
+_migrate_status=$?
+set -e
+if [ "$_migrate_status" -ne 0 ]; then
+  # DB often already has tables (e.g. from tests) while alembic_version is empty
+  if echo "$_migrate_out" | grep -q "already exists"; then
+    echo "  Existing tables found without Alembic history; stamping head..."
+    alembic stamp head
+  else
+    echo "$_migrate_out"
+    exit "$_migrate_status"
+  fi
+fi
 
 # ── Frontend setup ───────────────────────────────────────────────────
 echo ""
 echo "Setting up frontend..."
 cd "$WEB_DIR"
+
+if [ ! -f "$WEB_DIR/.env.local" ]; then
+  if [ -f "$WEB_DIR/.env.example" ]; then
+    echo "  Creating web/.env.local from .env.example..."
+    cp "$WEB_DIR/.env.example" "$WEB_DIR/.env.local"
+  else
+    echo "  Creating web/.env.local with default API URL..."
+    echo "NEXT_PUBLIC_API_URL=http://localhost:8000" >"$WEB_DIR/.env.local"
+  fi
+fi
 
 if [ ! -d "$WEB_DIR/node_modules" ]; then
   echo "  Installing npm dependencies..."
@@ -59,7 +82,7 @@ echo ""
 echo "Setup complete!"
 echo ""
 echo "To start the backend:"
-echo "  cd api && source .venv/bin/activate && uvicorn main:app --reload"
+echo "  cd api && source .venv/bin/activate && python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000"
 echo ""
 echo "To start the frontend:"
 echo "  cd web && npm run dev"
@@ -69,5 +92,5 @@ if [[ "${1:-}" == "--run" ]]; then
   echo "Starting backend server..."
   cd "$API_DIR"
   source "$VENV_DIR/bin/activate"
-  exec python -m uvicorn main:app --reload
+  exec python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 fi
