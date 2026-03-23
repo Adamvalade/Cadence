@@ -1,11 +1,16 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -19,6 +24,26 @@ def create_app() -> FastAPI:
     @app.exception_handler(ValueError)
     async def value_error_handler(request: Request, exc: ValueError):
         return JSONResponse(status_code=422, content={"detail": str(exc)})
+
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(request: Request, exc: Exception):
+        """Return JSON (with CORS) instead of letting Starlette emit a bare 500 without CORS headers."""
+        if isinstance(exc, StarletteHTTPException):
+            return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+        if isinstance(exc, RequestValidationError):
+            from fastapi.exception_handlers import request_validation_exception_handler
+
+            return await request_validation_exception_handler(request, exc)
+        if isinstance(exc, ResponseValidationError):
+            from fastapi.exception_handlers import response_validation_exception_handler
+
+            return await response_validation_exception_handler(request, exc)
+
+        logger.exception("Unhandled exception")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error"},
+        )
 
     app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
     app.add_middleware(

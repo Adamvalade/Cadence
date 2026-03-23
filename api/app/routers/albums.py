@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -10,6 +11,8 @@ from app.models.review import Review
 from app.models.user import User
 from app.schemas.album import AlbumCreate, AlbumResponse, AlbumSearchResult
 from app.services.spotify import SpotifyService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -31,12 +34,32 @@ def _album_response(album: Album, avg_rating: float | None = None, review_count:
 
 @router.get("/search", response_model=list[AlbumSearchResult])
 async def search_albums(q: str = Query(min_length=1), db: AsyncSession = Depends(get_db)):
-    spotify = SpotifyService()
-    results = spotify.search_albums(q)
+    try:
+        spotify = SpotifyService()
+        results = spotify.search_albums(q)
+    except Exception:
+        logger.exception("Spotify search failed for query=%r", q)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Spotify search is temporarily unavailable. Check API credentials and try again.",
+        ) from None
 
-    spotify_ids = [r.spotify_id for r in results]
-    existing = await db.execute(select(Album).where(Album.spotify_id.in_(spotify_ids)))
-    existing_map = {a.spotify_id: str(a.id) for a in existing.scalars().all()}
+    if not results:
+        return results
+
+    spotify_ids = [r.spotify_id for r in results if r.spotify_id]
+    if not spotify_ids:
+        return results
+
+    try:
+        existing = await db.execute(select(Album).where(Album.spotify_id.in_(spotify_ids)))
+        existing_map = {a.spotify_id: str(a.id) for a in existing.scalars().all()}
+    except Exception:
+        logger.exception("Database lookup failed during album search")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not look up albums in the database.",
+        ) from None
 
     for r in results:
         r.existing_id = existing_map.get(r.spotify_id)
