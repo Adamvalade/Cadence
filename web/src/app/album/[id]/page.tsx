@@ -12,9 +12,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import StarRating from "@/components/StarRating";
 import ReviewCard from "@/components/ReviewCard";
 import ListenStatusButton from "@/components/ListenStatusButton";
+import AddToListButton from "@/components/AddToListButton";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { Album, Review } from "@/lib/types";
+import { useTitle } from "@/lib/useTitle";
 
 export default function AlbumDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -23,6 +25,8 @@ export default function AlbumDetailPage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [listenStatus, setListenStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useTitle(album ? `${album.title} by ${album.artist}` : undefined);
 
   useEffect(() => {
     if (!id) return;
@@ -127,12 +131,13 @@ export default function AlbumDetailPage() {
           )}
 
           {user && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Button render={<Link href={`/album/${id}/review`} />}>Log this album</Button>
               <ListenStatusButton
                 albumId={id}
                 initialStatus={listenStatus as "want_to_listen" | "listening" | "listened" | null}
               />
+              <AddToListButton albumId={id} />
             </div>
           )}
         </div>

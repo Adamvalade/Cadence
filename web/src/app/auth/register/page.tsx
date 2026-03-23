@@ -8,8 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
+import { useTitle } from "@/lib/useTitle";
 
 export default function RegisterPage() {
+  useTitle("Sign up");
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");

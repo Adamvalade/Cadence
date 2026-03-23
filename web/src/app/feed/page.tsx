@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Loader2, Music } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import ReviewCard from "@/components/ReviewCard";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useTitle } from "@/lib/useTitle";
 import type { FeedResponse, Review } from "@/lib/types";
 
 function FeedSkeleton() {
@@ -29,6 +31,7 @@ function FeedSkeleton() {
 }
 
 export default function FeedPage() {
+  useTitle("Feed");
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -97,11 +100,20 @@ export default function FeedPage() {
           <Button variant="outline" onClick={() => loadFeed()}>Try again</Button>
         </div>
       ) : reviews.length === 0 ? (
-        <div className="text-center py-12 space-y-3">
-          <p className="text-muted-foreground">Your feed is empty.</p>
-          <p className="text-sm text-muted-foreground">
-            Follow other users to see their reviews here.
-          </p>
+        <div className="text-center py-16 space-y-4">
+          <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+            <Music className="h-8 w-8 text-muted-foreground/50" />
+          </div>
+          <div className="space-y-1">
+            <p className="font-medium text-lg">Your feed is empty</p>
+            <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+              Follow other users to see their reviews here, or discover trending albums.
+            </p>
+          </div>
+          <div className="flex gap-2 justify-center">
+            <Button variant="outline" render={<Link href="/discover" />}>Discover</Button>
+            <Button render={<Link href="/search" />}>Search albums</Button>
+          </div>
         </div>
       ) : (
         <div className="space-y-4">

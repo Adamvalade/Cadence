@@ -37,6 +37,7 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      ENVIRONMENT: production
     ports: ["8000:8000"]
 
   web:

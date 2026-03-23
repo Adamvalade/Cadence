@@ -142,6 +142,28 @@ async def delete_list(
     await db.commit()
 
 
+@router.get("/mine", response_model=list[ListResponse])
+async def get_my_lists(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(List).where(List.user_id == current_user.id).order_by(List.created_at.desc())
+    )
+    lists = result.scalars().all()
+    return [
+        ListResponse(
+            id=str(lst.id),
+            user_id=str(lst.user_id),
+            title=lst.title,
+            description=lst.description,
+            is_public=lst.is_public,
+            created_at=lst.created_at.isoformat(),
+        )
+        for lst in lists
+    ]
+
+
 @router.get("", response_model=list[ListResponse])
 async def get_user_lists(
     username: str = Query(...),

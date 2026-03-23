@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/lib/auth";
+import { ThemeProvider } from "@/lib/theme";
 import Navbar from "@/components/Navbar";
 import "./globals.css";
 
@@ -16,8 +17,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cadence",
+  title: {
+    default: "Cadence",
+    template: "%s | Cadence",
+  },
   description: "Log, rate, and review the music you listen to.",
+  openGraph: {
+    title: "Cadence",
+    description: "Log, rate, and review the music you listen to.",
+    siteName: "Cadence",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
@@ -29,12 +39,15 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
+      suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
-        <AuthProvider>
-          <Navbar />
-          <main className="flex-1">{children}</main>
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <Navbar />
+            <main className="flex-1">{children}</main>
+          </AuthProvider>
+        </ThemeProvider>
         <Toaster />
       </body>
     </html>

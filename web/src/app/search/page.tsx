@@ -8,6 +8,7 @@ import { Search, Music, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useTitle } from "@/lib/useTitle";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { api } from "@/lib/api";
@@ -22,6 +23,7 @@ interface UserSearchResult {
 }
 
 export default function SearchPage() {
+  useTitle("Search");
   const [query, setQuery] = useState("");
   const [albumResults, setAlbumResults] = useState<AlbumSearchResult[]>([]);
   const [userResults, setUserResults] = useState<UserSearchResult[]>([]);

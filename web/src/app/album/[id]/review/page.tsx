@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useTitle } from "@/lib/useTitle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import StarRating from "@/components/StarRating";
@@ -16,6 +17,7 @@ import { useAuth } from "@/lib/auth";
 import type { Album, Review } from "@/lib/types";
 
 export default function ReviewPage() {
+  useTitle("Write a Review");
   const { id } = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");

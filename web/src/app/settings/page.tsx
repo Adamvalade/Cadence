@@ -8,11 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useTitle } from "@/lib/useTitle";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { UserProfile } from "@/lib/types";
 
 export default function SettingsPage() {
+  useTitle("Settings");
   const { user, loading: authLoading, refresh } = useAuth();
   const router = useRouter();
 

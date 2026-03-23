@@ -13,6 +13,7 @@ import ReviewCard from "@/components/ReviewCard";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { Review, UserList, UserProfile } from "@/lib/types";
+import { useTitle } from "@/lib/useTitle";
 
 function ProfileSkeleton() {
   return (
@@ -42,6 +43,8 @@ export default function ProfilePage() {
   const [lists, setLists] = useState<UserList[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
+
+  useTitle(profile ? `${profile.display_name || profile.username} (@${profile.username})` : undefined);
 
   useEffect(() => {
     if (!username) return;
@@ -160,7 +163,14 @@ export default function ProfilePage() {
 
         <TabsContent value="reviews" className="mt-4 space-y-4">
           {reviews.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">No reviews yet.</p>
+            <div className="text-center py-12 space-y-2">
+              <p className="text-muted-foreground">No reviews yet.</p>
+              {isOwnProfile && (
+                <Button variant="outline" size="sm" render={<Link href="/search" />}>
+                  Search for an album to review
+                </Button>
+              )}
+            </div>
           ) : (
             reviews.map((review) => (
               <ReviewCard key={review.id} review={review} onDelete={handleDeleteReview} />
@@ -170,7 +180,14 @@ export default function ProfilePage() {
 
         <TabsContent value="lists" className="mt-4 space-y-3">
           {lists.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">No lists yet.</p>
+            <div className="text-center py-12 space-y-2">
+              <p className="text-muted-foreground">No lists yet.</p>
+              {isOwnProfile && (
+                <p className="text-sm text-muted-foreground">
+                  Visit an album page and use &ldquo;Add to list&rdquo; to create your first list.
+                </p>
+              )}
+            </div>
           ) : (
             lists.map((list) => (
               <Link key={list.id} href={`/lists/${list.id}`} className="block">

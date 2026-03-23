@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import ReviewCard from "@/components/ReviewCard";
 import { api } from "@/lib/api";
+import { useTitle } from "@/lib/useTitle";
 import type { Album, Review } from "@/lib/types";
 
 function AlbumGrid({ albums }: { albums: Album[] }) {
@@ -63,6 +64,7 @@ function AlbumGridSkeleton() {
 }
 
 export default function DiscoverPage() {
+  useTitle("Discover");
   const [trending, setTrending] = useState<Album[]>([]);
   const [recentReviews, setRecentReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
