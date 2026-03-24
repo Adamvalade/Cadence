@@ -3,13 +3,17 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import get_current_user, get_db
+from app.core.deps import get_current_user, get_db, get_optional_user
 from app.models.album import Album
 from app.models.review import Review
+from app.models.track import Track
+from app.models.track_rating import TrackRating
 from app.models.user import User
 from app.schemas.album import AlbumCreate, AlbumResponse, AlbumSearchResult
+from app.schemas.track import AlbumTrackResponse, AlbumTracksPayload, TrackRatingUpsert
 from app.services.spotify import SpotifyService
 
 logger = logging.getLogger(__name__)
@@ -65,6 +69,133 @@ async def search_albums(q: str = Query(min_length=1), db: AsyncSession = Depends
         r.existing_id = existing_map.get(r.spotify_id)
 
     return results
+
+
+async def _ensure_tracks_synced(db: AsyncSession, album: Album) -> None:
+    existing_count = await db.scalar(select(func.count()).select_from(Track).where(Track.album_id == album.id))
+    if existing_count and existing_count > 0:
+        return
+    if not album.spotify_id:
+        return
+    spotify = SpotifyService()
+    try:
+        raw = spotify.get_album_tracks(album.spotify_id)
+    except Exception:
+        logger.exception("Spotify album_tracks failed for album id=%s", album.id)
+        return
+    if not raw:
+        return
+    for t in raw:
+        db.add(
+            Track(
+                album_id=album.id,
+                spotify_track_id=t["spotify_track_id"],
+                title=(t["title"] or "Unknown")[:500],
+                disc_number=t["disc_number"],
+                track_number=t["track_number"],
+            )
+        )
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+
+
+@router.get("/{album_id}/tracks", response_model=AlbumTracksPayload)
+async def get_album_tracks(
+    album_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User | None = Depends(get_optional_user),
+):
+    result = await db.execute(select(Album).where(Album.id == uuid.UUID(album_id)))
+    album = result.scalar_one_or_none()
+    if not album:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Album not found")
+
+    await _ensure_tracks_synced(db, album)
+
+    tracks_result = await db.execute(
+        select(Track)
+        .where(Track.album_id == album.id)
+        .order_by(Track.disc_number, Track.track_number, Track.title)
+    )
+    track_list = list(tracks_result.scalars().all())
+
+    ratings_map: dict[uuid.UUID, int] = {}
+    if current_user and track_list:
+        ids = [t.id for t in track_list]
+        ratings_rows = await db.execute(
+            select(TrackRating).where(
+                TrackRating.user_id == current_user.id,
+                TrackRating.track_id.in_(ids),
+            )
+        )
+        for tr in ratings_rows.scalars().all():
+            ratings_map[tr.track_id] = tr.rating
+
+    items = [
+        AlbumTrackResponse(
+            id=str(t.id),
+            spotify_track_id=t.spotify_track_id,
+            title=t.title,
+            disc_number=t.disc_number,
+            track_number=t.track_number,
+            my_rating=ratings_map.get(t.id),
+        )
+        for t in track_list
+    ]
+    rated_values = [ratings_map[t.id] for t in track_list if t.id in ratings_map]
+    my_avg = round(sum(rated_values) / len(rated_values), 1) if rated_values else None
+
+    return AlbumTracksPayload(
+        tracks=items,
+        track_count=len(items),
+        my_rated_count=len(rated_values),
+        my_track_average=my_avg,
+    )
+
+
+@router.put("/{album_id}/tracks/{track_id}/rating", response_model=AlbumTrackResponse)
+async def upsert_track_rating(
+    album_id: str,
+    track_id: str,
+    body: TrackRatingUpsert,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    album_result = await db.execute(select(Album).where(Album.id == uuid.UUID(album_id)))
+    if not album_result.scalar_one_or_none():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Album not found")
+
+    track_result = await db.execute(select(Track).where(Track.id == uuid.UUID(track_id)))
+    track = track_result.scalar_one_or_none()
+    aid = uuid.UUID(album_id)
+    if not track or track.album_id != aid:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
+
+    existing = await db.execute(
+        select(TrackRating).where(
+            TrackRating.user_id == current_user.id,
+            TrackRating.track_id == track.id,
+        )
+    )
+    row = existing.scalar_one_or_none()
+    if row:
+        row.rating = body.rating
+    else:
+        row = TrackRating(user_id=current_user.id, track_id=track.id, rating=body.rating)
+        db.add(row)
+    await db.commit()
+    await db.refresh(row)
+
+    return AlbumTrackResponse(
+        id=str(track.id),
+        spotify_track_id=track.spotify_track_id,
+        title=track.title,
+        disc_number=track.disc_number,
+        track_number=track.track_number,
+        my_rating=row.rating,
+    )
 
 
 @router.get("/{album_id}", response_model=AlbumResponse)

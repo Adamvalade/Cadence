@@ -21,3 +21,4 @@ class Album(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     reviews: Mapped[list["Review"]] = relationship(back_populates="album", lazy="selectin")  # noqa: F821
+    tracks: Mapped[list["Track"]] = relationship(back_populates="album", lazy="selectin")  # noqa: F821

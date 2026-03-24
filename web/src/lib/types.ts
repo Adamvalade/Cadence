@@ -40,6 +40,22 @@ export interface AlbumSearchResult {
   existing_id: string | null;
 }
 
+export interface AlbumTrackRow {
+  id: string;
+  spotify_track_id: string;
+  title: string;
+  disc_number: number;
+  track_number: number;
+  my_rating: number | null;
+}
+
+export interface AlbumTracksPayload {
+  tracks: AlbumTrackRow[];
+  track_count: number;
+  my_rated_count: number;
+  my_track_average: number | null;
+}
+
 export interface Review {
   id: string;
   user_id: string;

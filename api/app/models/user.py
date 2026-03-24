@@ -24,3 +24,4 @@ class User(Base):
 
     reviews: Mapped[list["Review"]] = relationship(back_populates="user", lazy="selectin")  # noqa: F821
     lists: Mapped[list["List"]] = relationship(back_populates="user", lazy="selectin")  # noqa: F821
+    track_ratings: Mapped[list["TrackRating"]] = relationship(back_populates="user", lazy="selectin")  # noqa: F821

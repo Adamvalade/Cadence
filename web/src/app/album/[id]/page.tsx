@@ -13,6 +13,7 @@ import StarRating from "@/components/StarRating";
 import ReviewCard from "@/components/ReviewCard";
 import ListenStatusButton from "@/components/ListenStatusButton";
 import AddToListButton from "@/components/AddToListButton";
+import AlbumTrackRatings from "@/components/AlbumTrackRatings";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { Album, Review } from "@/lib/types";
@@ -142,6 +143,14 @@ export default function AlbumDetailPage() {
           )}
         </div>
       </div>
+
+      <Separator className="my-8" />
+
+      <AlbumTrackRatings
+        albumId={id}
+        hasSpotify={!!album.spotify_id}
+        canRate={!!user}
+      />
 
       <Separator className="my-8" />
 

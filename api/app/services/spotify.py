@@ -88,6 +88,42 @@ class SpotifyService:
             "genre": ", ".join(album.get("genres", [])[:3]) or None,
         }
 
+    def get_album_tracks(self, spotify_album_id: str) -> list[dict]:
+        """Paginate Spotify album tracks (50 per page)."""
+        if not self._sp:
+            return []
+
+        market = settings.SPOTIFY_MARKET.strip() or "US"
+        out: list[dict] = []
+        offset = 0
+        page_limit = 50
+        while True:
+            page = self._sp.album_tracks(
+                spotify_album_id,
+                limit=page_limit,
+                offset=offset,
+                market=market,
+            )
+            items = page.get("items") or []
+            for t in items:
+                tid = t.get("id")
+                if not tid:
+                    continue
+                out.append(
+                    {
+                        "spotify_track_id": tid,
+                        "title": t.get("name") or "Unknown",
+                        "disc_number": int(t.get("disc_number") or 1),
+                        "track_number": int(t.get("track_number") or 0),
+                    }
+                )
+            if not page.get("next"):
+                break
+            offset += len(items)
+            if not items:
+                break
+        return out
+
     @staticmethod
     def _parse_year(date_str: str) -> int | None:
         if not date_str:
