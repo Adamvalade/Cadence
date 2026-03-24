@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/lib/auth";
 import { ThemeProvider } from "@/lib/theme";
 import Navbar from "@/components/Navbar";
+import { AuthGate } from "@/components/AuthGate";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -38,14 +39,16 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full dark`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
         <ThemeProvider>
           <AuthProvider>
             <Navbar />
-            <main className="flex-1 app-shell">{children}</main>
+            <main className="flex-1 app-shell">
+              <AuthGate>{children}</AuthGate>
+            </main>
           </AuthProvider>
         </ThemeProvider>
         <Toaster />

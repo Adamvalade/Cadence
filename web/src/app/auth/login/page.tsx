@@ -36,10 +36,10 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-[calc(100vh-3.5rem)] px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Welcome back</CardTitle>
+    <div className="flex items-center justify-center min-h-[calc(100vh-3rem)] px-3 py-6 sm:px-4">
+      <Card className="w-full max-w-md border-border/70 shadow-sm">
+        <CardHeader className="space-y-1 pb-3 text-center">
+          <CardTitle className="text-xl">Welcome back</CardTitle>
           <CardDescription>Log in to your Cadence account</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -79,6 +79,7 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
                 required
               />
             </div>

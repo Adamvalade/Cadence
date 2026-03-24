@@ -18,6 +18,7 @@ export default function RegisterPage() {
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
@@ -26,6 +27,10 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    if (password !== passwordConfirm) {
+      setError("Passwords do not match.");
+      return;
+    }
     setLoading(true);
     try {
       await register(email, username, password, displayName);
@@ -38,10 +43,10 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-[calc(100vh-3.5rem)] px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Create an account</CardTitle>
+    <div className="flex items-center justify-center min-h-[calc(100vh-3rem)] px-3 py-6 sm:px-4">
+      <Card className="w-full max-w-md border-border/70 shadow-sm">
+        <CardHeader className="space-y-1 pb-3 text-center">
+          <CardTitle className="text-xl">Create an account</CardTitle>
           <CardDescription>Start logging the music you love</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -101,6 +106,19 @@ export default function RegisterPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 minLength={8}
+                autoComplete="new-password"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="passwordConfirm">Confirm password</Label>
+              <Input
+                id="passwordConfirm"
+                type="password"
+                value={passwordConfirm}
+                onChange={(e) => setPasswordConfirm(e.target.value)}
+                minLength={8}
+                autoComplete="new-password"
                 required
               />
             </div>

@@ -9,7 +9,7 @@ from app.services.feed import get_feed_items
 router = APIRouter()
 
 
-@router.get("", response_model=FeedResponse)
+@router.get("/feed", response_model=FeedResponse)
 async def get_feed(
     limit: int = Query(default=20, le=50),
     cursor: str | None = Query(default=None),

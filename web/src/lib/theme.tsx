@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useLayoutEffect, useState } from "react";
 
 type Theme = "dark" | "light";
 
@@ -9,17 +9,16 @@ interface ThemeCtx {
   toggle: () => void;
 }
 
-const ThemeContext = createContext<ThemeCtx>({ theme: "dark", toggle: () => {} });
+const ThemeContext = createContext<ThemeCtx>({ theme: "light", toggle: () => {} });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>("light");
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const stored = localStorage.getItem("cadence-theme") as Theme | null;
-    if (stored === "light" || stored === "dark") {
-      setTheme(stored);
-      applyTheme(stored);
-    }
+    const next = stored === "light" || stored === "dark" ? stored : "light";
+    setTheme(next);
+    applyTheme(next);
   }, []);
 
   const toggle = useCallback(() => {

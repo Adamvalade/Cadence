@@ -6,6 +6,12 @@ export interface UserBrief {
   avatar_url: string | null;
 }
 
+export interface AuthResponse {
+  message: string;
+  user: UserBrief;
+  access_token: string;
+}
+
 export interface UserRatingStats {
   album_ratings_count: number;
   album_ratings_average: number | null;

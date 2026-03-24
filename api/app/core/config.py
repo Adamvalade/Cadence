@@ -1,3 +1,5 @@
+from urllib.parse import urlparse
+
 from pydantic_settings import BaseSettings
 
 
@@ -33,22 +35,31 @@ class Settings(BaseSettings):
         return self.is_production
 
     @property
-    def cross_scheme_localhost_dev(self) -> bool:
-        """Next on http://localhost while API is https://localhost — different schemes = cross-site; Lax cookies skip fetch()."""
-        if self.is_production:
-            return False
-        u = self.FRONTEND_URL.lower().strip()
-        return u.startswith("http://localhost") or u.startswith("http://127.0.0.1")
-
-    @property
     def access_token_cookie_samesite(self) -> str:
-        return "none" if self.cross_scheme_localhost_dev else "lax"
+        # SameSite=None requires Secure; only use in production over HTTPS.
+        return "lax"
 
     @property
     def access_token_cookie_secure(self) -> bool:
-        if self.cross_scheme_localhost_dev:
-            return True
-        return self.cookie_secure
+        # Browsers ignore Secure cookies set over plain HTTP — dev APIs are usually http://,
+        # so forcing Secure=True breaks session cookies entirely while JSON login still "works".
+        return self.is_production
+
+    @property
+    def cors_allow_origins(self) -> list[str]:
+        """Origins allowed for credentialed CORS (must list exact browser origins)."""
+        primary = self.FRONTEND_URL.rstrip("/")
+        if self.is_production:
+            return [primary]
+        origins = {primary}
+        parsed = urlparse(self.FRONTEND_URL)
+        host, port = parsed.hostname, parsed.port
+        scheme = parsed.scheme or "http"
+        if host == "localhost" and port:
+            origins.add(f"{scheme}://127.0.0.1:{port}")
+        elif host == "127.0.0.1" and port:
+            origins.add(f"{scheme}://localhost:{port}")
+        return sorted(origins)
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

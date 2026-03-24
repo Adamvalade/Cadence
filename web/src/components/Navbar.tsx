@@ -41,36 +41,27 @@ export default function Navbar() {
     router.push("/");
   };
 
-  const navLinks = [
-    { href: "/search", label: "Search", icon: Search },
-    { href: "/discover", label: "Discover", icon: Compass },
-    { href: "/social", label: "Social", icon: Users },
-    ...(user
-      ? [
-          { href: "/feed", label: "Feed", icon: Rss },
-          { href: `/${user.username}`, label: "Profile", icon: User },
-          { href: "/library", label: "Library", icon: Library },
-        ]
-      : [
-          {
-            href: "/auth/login",
-            label: "Profile",
-            icon: User,
-            title: "Log in to view your profile",
-          },
-        ]),
-  ];
+  const navLinks = user
+    ? [
+        { href: "/search", label: "Search", icon: Search },
+        { href: "/discover", label: "Discover", icon: Compass },
+        { href: "/social", label: "Social", icon: Users },
+        { href: "/feed", label: "Feed", icon: Rss },
+        { href: `/${user.username}`, label: "Profile", icon: User },
+        { href: "/library", label: "Library", icon: Library },
+      ]
+    : [];
 
   return (
     <nav className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/55">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
-        <div className="flex items-center gap-8">
+      <div className="mx-auto flex h-12 max-w-6xl items-center justify-between px-3 sm:px-5">
+        <div className="flex items-center gap-5">
           <Link
-            href="/"
-            className="group flex items-center gap-2 text-lg font-semibold tracking-tight"
+            href={user ? "/" : "/auth/login"}
+            className="group flex items-center gap-2 text-base font-semibold tracking-tight"
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 text-primary ring-1 ring-primary/20 transition group-hover:bg-primary/20">
-              <Music className="h-4 w-4" />
+            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/15 text-primary ring-1 ring-primary/20 transition group-hover:bg-primary/20">
+              <Music className="h-3.5 w-3.5" />
             </span>
             <span className="bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent dark:from-white dark:to-white/75">
               Cadence
@@ -78,27 +69,28 @@ export default function Navbar() {
           </Link>
 
           {/* Desktop nav links */}
-          <div className="hidden items-center gap-1 md:flex">
-            {navLinks.map(({ href, label, icon: Icon, title }) => {
-              const active = navItemActive(pathname, href);
-              return (
-                <Link
-                  key={`${href}-${label}`}
-                  href={href}
-                  title={title}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors",
-                    active
-                      ? "bg-muted/80 text-foreground"
-                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                  )}
-                >
-                  <Icon className="h-4 w-4 opacity-80" />
-                  {label}
-                </Link>
-              );
-            })}
-          </div>
+          {navLinks.length > 0 && (
+            <div className="hidden items-center gap-0.5 md:flex">
+              {navLinks.map(({ href, label, icon: Icon }) => {
+                const active = navItemActive(pathname, href);
+                return (
+                  <Link
+                    key={`${href}-${label}`}
+                    href={href}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-md px-2 py-1 text-sm transition-colors",
+                      active
+                        ? "bg-muted/80 text-foreground"
+                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5 opacity-80" />
+                    {label}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -157,13 +149,12 @@ export default function Navbar() {
                 <SheetTitle>Menu</SheetTitle>
               </SheetHeader>
               <div className="flex flex-col gap-1 mt-4">
-                {navLinks.map(({ href, label, icon: Icon, title }) => {
+                {navLinks.map(({ href, label, icon: Icon }) => {
                   const active = navItemActive(pathname, href);
                   return (
                     <Link
                       key={`${href}-${label}`}
                       href={href}
-                      title={title}
                       onClick={() => setMobileOpen(false)}
                       className={cn(
                         "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
@@ -176,7 +167,7 @@ export default function Navbar() {
                   );
                 })}
 
-                <div className="border-t my-2" />
+                {navLinks.length > 0 && <div className="border-t my-2" />}
 
                 {user ? (
                   <>

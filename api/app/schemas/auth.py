@@ -16,6 +16,8 @@ class LoginRequest(BaseModel):
 class AuthResponse(BaseModel):
     message: str
     user: "UserBrief"
+    # Also returned for SPAs when the browser cannot send cross-site cookies (e.g. localhost → 127.0.0.1).
+    access_token: str
 
 
 class UserBrief(BaseModel):

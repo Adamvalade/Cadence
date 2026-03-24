@@ -1,5 +1,5 @@
 import secrets
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -53,8 +53,7 @@ if settings.GOOGLE_CLIENT_ID:
     )
 
 
-def _set_token_cookie(response: Response, user_id: str) -> None:
-    token = create_access_token(user_id)
+def _attach_access_token_cookie(response: Response, token: str) -> None:
     response.set_cookie(
         "access_token",
         token,
@@ -63,6 +62,12 @@ def _set_token_cookie(response: Response, user_id: str) -> None:
         secure=settings.access_token_cookie_secure,
         max_age=60 * 60 * 24 * 7,
     )
+
+
+def _issue_session(response: Response, user_id: str) -> str:
+    token = create_access_token(user_id)
+    _attach_access_token_cookie(response, token)
+    return token
 
 
 def _user_brief(user: User) -> UserBrief:
@@ -97,8 +102,8 @@ async def register(request: Request, body: RegisterRequest, response: Response, 
     await db.commit()
     await db.refresh(user)
 
-    _set_token_cookie(response, str(user.id))
-    return AuthResponse(message="Registration successful", user=_user_brief(user))
+    token = _issue_session(response, str(user.id))
+    return AuthResponse(message="Registration successful", user=_user_brief(user), access_token=token)
 
 
 @router.post("/login", response_model=AuthResponse)
@@ -110,8 +115,8 @@ async def login(request: Request, body: LoginRequest, response: Response, db: As
     if not user or not user.password_hash or not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
-    _set_token_cookie(response, str(user.id))
-    return AuthResponse(message="Login successful", user=_user_brief(user))
+    token = _issue_session(response, str(user.id))
+    return AuthResponse(message="Login successful", user=_user_brief(user), access_token=token)
 
 
 @router.post("/logout")
@@ -195,8 +200,10 @@ async def spotify_callback(request: Request, db: AsyncSession = Depends(get_db))
     await db.commit()
     await db.refresh(user)
 
-    redirect = RedirectResponse(url=f"{settings.FRONTEND_URL}/auth/callback")
-    _set_token_cookie(redirect, str(user.id))
+    token = create_access_token(str(user.id))
+    url = f"{settings.FRONTEND_URL.rstrip('/')}/auth/callback#access_token={quote(token, safe='')}"
+    redirect = RedirectResponse(url=url, status_code=307)
+    _attach_access_token_cookie(redirect, token)
     return redirect
 
 
@@ -245,8 +252,10 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
         await db.commit()
         await db.refresh(user)
 
-    redirect = RedirectResponse(url=f"{settings.FRONTEND_URL}/auth/callback")
-    _set_token_cookie(redirect, str(user.id))
+    token = create_access_token(str(user.id))
+    url = f"{settings.FRONTEND_URL.rstrip('/')}/auth/callback#access_token={quote(token, safe='')}"
+    redirect = RedirectResponse(url=url, status_code=307)
+    _attach_access_token_cookie(redirect, token)
     return redirect
 
 

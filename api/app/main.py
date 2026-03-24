@@ -48,7 +48,7 @@ def create_app() -> FastAPI:
     app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[settings.FRONTEND_URL],
+        allow_origins=settings.cors_allow_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -62,7 +62,7 @@ def create_app() -> FastAPI:
     app.include_router(albums.router, prefix="/albums", tags=["albums"])
     app.include_router(reviews.router, prefix="/reviews", tags=["reviews"])
     app.include_router(follows.router, tags=["follows"])
-    app.include_router(feed.router, prefix="/feed", tags=["feed"])
+    app.include_router(feed.router, tags=["feed"])
     app.include_router(lists.router, prefix="/lists", tags=["lists"])
     app.include_router(listen_status.router, prefix="/listen-status", tags=["listen-status"])
     app.include_router(discover.router, prefix="/discover", tags=["discover"])
