@@ -191,3 +191,37 @@ async def search_users(
             review_count=review_count,
         ))
     return items
+
+
+@router.get("/active-users", response_model=list[UserSearchResult])
+async def active_users(
+    limit: int = Query(default=16, le=30),
+    db: AsyncSession = Depends(get_db),
+):
+    """Users who have reviewed recently — entry points for the social graph."""
+    latest_per_user = (
+        select(Review.user_id, func.max(Review.created_at).label("last_review"))
+        .group_by(Review.user_id)
+        .subquery()
+    )
+    result = await db.execute(
+        select(User)
+        .join(latest_per_user, User.id == latest_per_user.c.user_id)
+        .order_by(latest_per_user.c.last_review.desc())
+        .limit(limit)
+    )
+    users = result.scalars().all()
+
+    items = []
+    for user in users:
+        review_count = (await db.execute(
+            select(func.count()).where(Review.user_id == user.id)
+        )).scalar() or 0
+        items.append(UserSearchResult(
+            id=str(user.id),
+            username=user.username,
+            display_name=user.display_name,
+            avatar_url=user.avatar_url,
+            review_count=review_count,
+        ))
+    return items

@@ -1,4 +1,5 @@
 import secrets
+from urllib.parse import urlparse
 
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -16,6 +17,20 @@ from app.schemas.auth import AuthResponse, LoginRequest, RegisterRequest, UserBr
 router = APIRouter()
 
 oauth = OAuth()
+
+
+def _spotify_redirect_uri(request: Request) -> str:
+    """Must exactly match a URI registered on the Spotify app."""
+    explicit = (settings.SPOTIFY_REDIRECT_URI or "").strip()
+    if explicit:
+        return explicit
+    base = str(request.base_url).rstrip("/")
+    return f"{base}/auth/spotify/callback"
+
+
+def _spotify_oauth_origin(redirect_uri: str) -> str:
+    p = urlparse(redirect_uri)
+    return f"{p.scheme}://{p.netloc}"
 
 if settings.SPOTIFY_CLIENT_ID:
     oauth.register(
@@ -44,8 +59,8 @@ def _set_token_cookie(response: Response, user_id: str) -> None:
         "access_token",
         token,
         httponly=True,
-        samesite="lax",
-        secure=settings.cookie_secure,
+        samesite=settings.access_token_cookie_samesite,  # type: ignore[arg-type]
+        secure=settings.access_token_cookie_secure,
         max_age=60 * 60 * 24 * 7,
     )
 
@@ -101,7 +116,13 @@ async def login(request: Request, body: LoginRequest, response: Response, db: As
 
 @router.post("/logout")
 async def logout(response: Response):
-    response.delete_cookie("access_token")
+    response.delete_cookie(
+        "access_token",
+        path="/",
+        httponly=True,
+        samesite=settings.access_token_cookie_samesite,  # type: ignore[arg-type]
+        secure=settings.access_token_cookie_secure,
+    )
     return {"message": "Logged out"}
 
 
@@ -117,7 +138,13 @@ async def me(current_user: User = Depends(get_current_user)):
 async def spotify_login(request: Request):
     if not settings.SPOTIFY_CLIENT_ID:
         raise HTTPException(status_code=501, detail="Spotify OAuth not configured")
-    redirect_uri = settings.SPOTIFY_REDIRECT_URI
+    redirect_uri = _spotify_redirect_uri(request)
+    explicit = (settings.SPOTIFY_REDIRECT_URI or "").strip()
+    if explicit:
+        want_origin = _spotify_oauth_origin(redirect_uri).rstrip("/")
+        got_origin = str(request.base_url).rstrip("/")
+        if want_origin != got_origin:
+            return RedirectResponse(url=f"{want_origin}/auth/spotify", status_code=307)
     return await oauth.spotify.authorize_redirect(request, redirect_uri)
 
 

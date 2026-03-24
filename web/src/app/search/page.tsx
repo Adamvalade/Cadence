@@ -17,21 +17,13 @@ import {
   pushRecentSearch,
   readRecentSearches,
 } from "@/lib/recentSearches";
-import type { Album, AlbumSearchResult } from "@/lib/types";
-
-interface UserSearchResult {
-  id: string;
-  username: string;
-  display_name: string;
-  avatar_url: string | null;
-  review_count: number;
-}
+import type { Album, AlbumSearchResult, DiscoverUser } from "@/lib/types";
 
 export default function SearchPage() {
   useTitle("Search");
   const [query, setQuery] = useState("");
   const [albumResults, setAlbumResults] = useState<AlbumSearchResult[]>([]);
-  const [userResults, setUserResults] = useState<UserSearchResult[]>([]);
+  const [userResults, setUserResults] = useState<DiscoverUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [tab, setTab] = useState("albums");
@@ -53,7 +45,7 @@ export default function SearchPage() {
 
     const [albums, users] = await Promise.allSettled([
       api.get<AlbumSearchResult[]>("/albums/search", { q: trimmed }),
-      api.get<UserSearchResult[]>("/discover/users", { q: trimmed }),
+      api.get<DiscoverUser[]>("/discover/users", { q: trimmed }),
     ]);
     setAlbumResults(albums.status === "fulfilled" ? albums.value : []);
     setUserResults(users.status === "fulfilled" ? users.value : []);

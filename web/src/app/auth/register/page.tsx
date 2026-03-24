@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { SpotifyAuthButton } from "@/components/SpotifyAuthButton";
 import { useAuth } from "@/lib/auth";
 import { useTitle } from "@/lib/useTitle";
 
@@ -42,7 +44,16 @@ export default function RegisterPage() {
           <CardTitle className="text-2xl">Create an account</CardTitle>
           <CardDescription>Start logging the music you love</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <SpotifyAuthButton />
+          <p className="text-xs text-center text-muted-foreground">
+            Or create an account with email and password below.
+          </p>
+          <div className="flex items-center gap-3">
+            <Separator className="flex-1" />
+            <span className="text-xs text-muted-foreground">or sign up</span>
+            <Separator className="flex-1" />
+          </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">

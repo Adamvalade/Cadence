@@ -3,63 +3,90 @@
 import Link from "next/link";
 import { Music, Star, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
 
 export default function HomePage() {
   const { user } = useAuth();
 
+  const features = [
+    {
+      icon: Music,
+      title: "Log albums",
+      body: "Search via Spotify or add manually and build a listening history you actually use.",
+    },
+    {
+      icon: Star,
+      title: "Rate & review",
+      body: "Score albums out of 10 and write reviews that show up for people who follow you.",
+    },
+    {
+      icon: Users,
+      title: "Follow friends",
+      body: "See what others are into in a feed built from real activity, not algorithms.",
+    },
+  ] as const;
+
   return (
     <div className="flex flex-col">
-      <section className="flex flex-col items-center justify-center text-center py-24 px-4">
-        <div className="flex items-center gap-3 mb-6">
-          <Music className="h-10 w-10" />
-          <h1 className="text-5xl font-bold tracking-tight">Cadence</h1>
+      <section className="relative px-4 pb-16 pt-20 sm:pb-20 sm:pt-28">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 overflow-hidden"
+        >
+          <div className="absolute left-1/2 top-0 h-[420px] w-[min(100%,720px)] -translate-x-1/2 rounded-full bg-primary/[0.12] blur-3xl dark:bg-primary/[0.18]" />
         </div>
-        <p className="text-xl text-muted-foreground max-w-lg mb-8">
-          Track albums you&apos;ve listened to. Rate and review them. See what your friends are into.
-        </p>
-        {user ? (
-          <div className="flex gap-3">
-            <Button size="lg" render={<Link href="/feed" />}>Go to Feed</Button>
-            <Button size="lg" variant="outline" render={<Link href="/search" />}>Search Albums</Button>
+        <div className="relative mx-auto flex max-w-2xl flex-col items-center text-center">
+          <p className="mb-4 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+            Your music, your circle
+          </p>
+          <h1 className="text-balance text-4xl font-semibold tracking-tight sm:text-5xl sm:leading-[1.1]">
+            Log what you listen to.{" "}
+            <span className="text-primary">Share</span> what it meant.
+          </h1>
+          <p className="mt-5 max-w-md text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg">
+            Track albums, rate and review them, and follow people to see their picks in one place.
+          </p>
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+            {user ? (
+              <>
+                <Button size="lg" className="min-w-[9rem] shadow-sm shadow-primary/10" render={<Link href="/feed" />}>
+                  Go to feed
+                </Button>
+                <Button size="lg" variant="outline" render={<Link href="/search" />}>
+                  Search albums
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button size="lg" className="min-w-[9rem] shadow-sm shadow-primary/10" render={<Link href="/auth/register" />}>
+                  Get started
+                </Button>
+                <Button size="lg" variant="outline" render={<Link href="/auth/login" />}>
+                  Log in
+                </Button>
+              </>
+            )}
           </div>
-        ) : (
-          <div className="flex gap-3">
-            <Button size="lg" render={<Link href="/auth/register" />}>Get Started</Button>
-            <Button size="lg" variant="outline" render={<Link href="/auth/login" />}>Log In</Button>
-          </div>
-        )}
+        </div>
       </section>
 
-      <section className="max-w-4xl mx-auto px-4 pb-24">
-        <div className="grid md:grid-cols-3 gap-8">
-          <div className="text-center space-y-3">
-            <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-              <Music className="h-6 w-6" />
-            </div>
-            <h3 className="font-semibold text-lg">Log Albums</h3>
-            <p className="text-sm text-muted-foreground">
-              Search for any album via Spotify or add it manually. Build your listening history.
-            </p>
-          </div>
-          <div className="text-center space-y-3">
-            <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-              <Star className="h-6 w-6" />
-            </div>
-            <h3 className="font-semibold text-lg">Rate &amp; Review</h3>
-            <p className="text-sm text-muted-foreground">
-              Give albums a rating out of 10 and write reviews to share your thoughts.
-            </p>
-          </div>
-          <div className="text-center space-y-3">
-            <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-              <Users className="h-6 w-6" />
-            </div>
-            <h3 className="font-semibold text-lg">Follow Friends</h3>
-            <p className="text-sm text-muted-foreground">
-              Follow people and see their latest reviews in your personalized feed.
-            </p>
-          </div>
+      <section className="mx-auto max-w-5xl px-4 pb-24 sm:px-6">
+        <div className="grid gap-4 sm:grid-cols-3 sm:gap-5">
+          {features.map(({ icon: Icon, title, body }) => (
+            <Card
+              key={title}
+              className="border-border/60 bg-card/60 py-5 shadow-none backdrop-blur-sm transition-colors hover:bg-card/90"
+            >
+              <CardContent className="flex flex-col items-center gap-3 px-5 text-center sm:items-start sm:text-left">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/12 text-primary ring-1 ring-primary/15">
+                  <Icon className="h-5 w-5" strokeWidth={1.75} />
+                </div>
+                <h3 className="text-base font-medium tracking-tight">{title}</h3>
+                <p className="text-sm leading-relaxed text-muted-foreground">{body}</p>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </section>
     </div>

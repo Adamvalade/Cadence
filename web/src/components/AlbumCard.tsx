@@ -17,7 +17,7 @@ interface AlbumCardProps {
 export default function AlbumCard({ id, title, artist, coverUrl, rating, reviewCount }: AlbumCardProps) {
   return (
     <Link href={`/album/${id}`}>
-      <Card className="overflow-hidden group hover:ring-2 hover:ring-primary/20 transition-all pt-0 gap-0">
+      <Card className="group gap-0 overflow-hidden border-border/50 pt-0 transition-all hover:border-primary/25 hover:ring-1 hover:ring-primary/15">
         <div className="aspect-square relative bg-muted">
           {coverUrl ? (
             <Image

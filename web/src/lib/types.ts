@@ -68,6 +68,15 @@ export interface AlbumSearchResult {
   existing_id: string | null;
 }
 
+/** From GET /discover/users and GET /discover/active-users */
+export interface DiscoverUser {
+  id: string;
+  username: string;
+  display_name: string;
+  avatar_url: string | null;
+  review_count: number;
+}
+
 export interface AlbumTrackRow {
   id: string;
   spotify_track_id: string;

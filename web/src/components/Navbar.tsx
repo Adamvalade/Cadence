@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Music, Search, LogOut, User, Library, Sun, Moon, Menu, Compass, Rss } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Music, Search, LogOut, User, Library, Sun, Moon, Menu, Compass, Rss, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -22,11 +22,18 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
+import { cn } from "@/lib/utils";
+
+function navItemActive(pathname: string, href: string) {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const { theme, toggle } = useTheme();
   const router = useRouter();
+  const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleLogout = async () => {
@@ -37,35 +44,60 @@ export default function Navbar() {
   const navLinks = [
     { href: "/search", label: "Search", icon: Search },
     { href: "/discover", label: "Discover", icon: Compass },
+    { href: "/social", label: "Social", icon: Users },
     ...(user
       ? [
           { href: "/feed", label: "Feed", icon: Rss },
+          { href: `/${user.username}`, label: "Profile", icon: User },
           { href: "/library", label: "Library", icon: Library },
         ]
-      : []),
+      : [
+          {
+            href: "/auth/login",
+            label: "Profile",
+            icon: User,
+            title: "Log in to view your profile",
+          },
+        ]),
   ];
 
   return (
-    <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-      <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center gap-2 font-bold text-lg">
-            <Music className="h-5 w-5" />
-            Cadence
+    <nav className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/55">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
+        <div className="flex items-center gap-8">
+          <Link
+            href="/"
+            className="group flex items-center gap-2 text-lg font-semibold tracking-tight"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 text-primary ring-1 ring-primary/20 transition group-hover:bg-primary/20">
+              <Music className="h-4 w-4" />
+            </span>
+            <span className="bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent dark:from-white dark:to-white/75">
+              Cadence
+            </span>
           </Link>
 
           {/* Desktop nav links */}
-          <div className="hidden md:flex items-center gap-4">
-            {navLinks.map(({ href, label, icon: Icon }) => (
-              <Link
-                key={href}
-                href={href}
-                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <Icon className="h-4 w-4" />
-                {label}
-              </Link>
-            ))}
+          <div className="hidden items-center gap-1 md:flex">
+            {navLinks.map(({ href, label, icon: Icon, title }) => {
+              const active = navItemActive(pathname, href);
+              return (
+                <Link
+                  key={`${href}-${label}`}
+                  href={href}
+                  title={title}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors",
+                    active
+                      ? "bg-muted/80 text-foreground"
+                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                  )}
+                >
+                  <Icon className="h-4 w-4 opacity-80" />
+                  {label}
+                </Link>
+              );
+            })}
           </div>
         </div>
 
@@ -93,10 +125,6 @@ export default function Navbar() {
                   </Avatar>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem onClick={() => router.push(`/${user.username}`)}>
-                    <User className="mr-2 h-4 w-4" />
-                    Profile
-                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => router.push("/library")}>
                     <Library className="mr-2 h-4 w-4" />
                     Library
@@ -129,30 +157,29 @@ export default function Navbar() {
                 <SheetTitle>Menu</SheetTitle>
               </SheetHeader>
               <div className="flex flex-col gap-1 mt-4">
-                {navLinks.map(({ href, label, icon: Icon }) => (
-                  <Link
-                    key={href}
-                    href={href}
-                    onClick={() => setMobileOpen(false)}
-                    className="flex items-center gap-3 px-3 py-2 rounded-md text-sm hover:bg-accent transition-colors"
-                  >
-                    <Icon className="h-4 w-4" />
-                    {label}
-                  </Link>
-                ))}
+                {navLinks.map(({ href, label, icon: Icon, title }) => {
+                  const active = navItemActive(pathname, href);
+                  return (
+                    <Link
+                      key={`${href}-${label}`}
+                      href={href}
+                      title={title}
+                      onClick={() => setMobileOpen(false)}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                        active ? "bg-muted text-foreground" : "hover:bg-accent"
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {label}
+                    </Link>
+                  );
+                })}
 
                 <div className="border-t my-2" />
 
                 {user ? (
                   <>
-                    <Link
-                      href={`/${user.username}`}
-                      onClick={() => setMobileOpen(false)}
-                      className="flex items-center gap-3 px-3 py-2 rounded-md text-sm hover:bg-accent transition-colors"
-                    >
-                      <User className="h-4 w-4" />
-                      Profile
-                    </Link>
                     <Link
                       href="/settings"
                       onClick={() => setMobileOpen(false)}
