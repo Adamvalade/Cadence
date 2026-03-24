@@ -29,11 +29,13 @@ Cadence/
 
 ## Running locally
 
-1. `docker compose up -d` — Postgres + Redis (Postgres is on host port **5433** by default).
-2. **API:** `cd api && source .venv/bin/activate && alembic upgrade head && python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000`
-3. **Web:** `cd web && npm run dev` (use `web/.env.local` with `NEXT_PUBLIC_API_URL=http://localhost:8000`).
+**First time:** `./bin/setup.sh` — installs Python deps, runs migrations, creates `web/.env.local`, `npm install`.
 
-Copy `api/.env.example` → `api/.env` and set `DATABASE_URL`, `SECRET_KEY`, optional Spotify keys, and `FRONTEND_URL=http://localhost:3000`.
+**Every time you want the site in the browser:** `./bin/dev.sh` — starts Docker (Postgres + Redis), API on **http://localhost:8000**, Next.js on **http://localhost:3000**.
+
+Or one shot: `./bin/setup.sh --dev` (setup + then same as `dev.sh`).
+
+Copy `api/.env.example` → `api/.env` and set `DATABASE_URL`, `SECRET_KEY`, optional Spotify keys, and `FRONTEND_URL=http://localhost:3000`. Postgres in Docker is on host port **5433** by default (`DATABASE_URL` in `.env.example` matches).
 
 ### Alembic: `relation "albums" already exists`
 

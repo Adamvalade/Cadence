@@ -1,7 +1,17 @@
 #!/usr/bin/env bash
+# One-time install: Docker deps, Python venv, migrations, npm install.
+# Does NOT start servers by default — use ./bin/dev.sh or ./bin/setup.sh --dev
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+RUN_DEV=false
+for _arg in "$@"; do
+  case "$_arg" in
+    --dev|--run)
+      RUN_DEV=true
+      ;;
+  esac
+done
 API_DIR="$ROOT_DIR/api"
 WEB_DIR="$ROOT_DIR/web"
 VENV_DIR="$API_DIR/.venv"
@@ -81,16 +91,18 @@ fi
 echo ""
 echo "Setup complete!"
 echo ""
-echo "To start the backend:"
-echo "  cd api && source .venv/bin/activate && python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000"
+
+if [[ "$RUN_DEV" == true ]]; then
+  echo "Starting app on localhost (API + web)..."
+  exec "$ROOT_DIR/bin/dev.sh"
+fi
+
+echo "Nothing is listening yet. To open the app locally, run:"
 echo ""
-echo "To start the frontend:"
+echo "  ./bin/dev.sh"
+echo ""
+echo "That starts Postgres/Redis (Docker), the API on :8000, and Next.js on :3000."
+echo "Or use two terminals:"
+echo "  cd api && source .venv/bin/activate && python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000"
 echo "  cd web && npm run dev"
 echo ""
-
-if [[ "${1:-}" == "--run" ]]; then
-  echo "Starting backend server..."
-  cd "$API_DIR"
-  source "$VENV_DIR/bin/activate"
-  exec python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
-fi

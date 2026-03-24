@@ -66,6 +66,15 @@ def create_app() -> FastAPI:
     app.include_router(listen_status.router, prefix="/listen-status", tags=["listen-status"])
     app.include_router(discover.router, prefix="/discover", tags=["discover"])
 
+    @app.get("/")
+    async def root():
+        return {
+            "service": "cadence-api",
+            "docs": "/docs",
+            "health": "/health",
+            "hint": "The web app runs separately (e.g. http://localhost:3000).",
+        }
+
     @app.get("/health")
     async def health():
         from sqlalchemy import text

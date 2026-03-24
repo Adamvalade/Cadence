@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     SPOTIFY_CLIENT_ID: str = ""
     SPOTIFY_CLIENT_SECRET: str = ""
     SPOTIFY_REDIRECT_URI: str = "http://localhost:8000/auth/spotify/callback"
+    # ISO 3166-1 alpha-2; client-credentials search/catalog calls need a market
+    SPOTIFY_MARKET: str = "US"
 
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""

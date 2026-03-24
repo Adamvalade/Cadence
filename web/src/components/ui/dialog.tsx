@@ -11,21 +11,8 @@ function Dialog({ ...props }: DialogPrimitive.Root.Props) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
 }
 
-function DialogTrigger({
-  nativeButton,
-  render,
-  ...props
-}: DialogPrimitive.Trigger.Props) {
-  const resolvedNative =
-    nativeButton ?? (render !== undefined ? false : undefined)
-  return (
-    <DialogPrimitive.Trigger
-      data-slot="dialog-trigger"
-      nativeButton={resolvedNative}
-      render={render}
-      {...props}
-    />
-  )
+function DialogTrigger({ ...props }: DialogPrimitive.Trigger.Props) {
+  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />
 }
 
 function DialogPortal({ ...props }: DialogPrimitive.Portal.Props) {
@@ -75,7 +62,6 @@ function DialogContent({
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            nativeButton={false}
             render={
               <Button
                 variant="ghost"
@@ -123,7 +109,7 @@ function DialogFooter({
     >
       {children}
       {showCloseButton && (
-        <DialogPrimitive.Close nativeButton={false} render={<Button variant="outline" />}>
+        <DialogPrimitive.Close render={<Button variant="outline" />}>
           Close
         </DialogPrimitive.Close>
       )}
