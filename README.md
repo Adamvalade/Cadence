@@ -51,7 +51,16 @@ Copy `api/.env.example` → `api/.env` and set `DATABASE_URL`, `SECRET_KEY`, opt
 
 **Hardening already in place:** OpenAPI `/docs` is disabled in production; `X-Request-ID` on responses; optional **`TRUSTED_HOSTS`** (comma-separated) enables `TrustedHostMiddleware`; `/health` checks Postgres and reports Redis; Next adds baseline security headers (frame deny, nosniff, referrer policy, permissions policy). [Dependabot](.github/dependabot.yml) is configured for `api`, `web`, and GitHub Actions.
 
-**Still your responsibility:** TLS termination (reverse proxy or platform edge), Postgres backups, strong unique secrets in a secret store, and monitoring/alerting (e.g. Sentry) if you want error aggregation.
+**Implemented in-repo (see [`deploy/README.md`](deploy/README.md) for commands and caveats):**
+
+| Topic | What to use |
+| ----- | ----------- |
+| **HTTPS at the edge** | [`deploy/docker-compose.caddy.yml`](deploy/docker-compose.caddy.yml) + [`deploy/caddy/Caddyfile`](deploy/caddy/Caddyfile) (Caddy + Let’s Encrypt). Hosted deploys can use the platform’s TLS instead. |
+| **Managed secrets** | [`deploy/docker-compose.secrets.yml`](deploy/docker-compose.secrets.yml) + files under `./secrets/`; API entrypoint supports `SECRET_KEY_FILE`, `POSTGRES_PASSWORD_FILE`, and `DATABASE_URL_FILE`. |
+| **Postgres backups** | [`deploy/docker-compose.backup.yml`](deploy/docker-compose.backup.yml) (daily `pg_dump` to `./data/pg-backups`). Prefer provider snapshots + off-site copies for real DR. |
+| **Sentry** | Optional `SENTRY_DSN` / `SENTRY_TRACES_SAMPLE_RATE` on the API (initialized in `api/main.py`). Next.js Sentry is documented in `deploy/README.md` only. |
+
+**Still your responsibility:** firewall rules (e.g. do not expose `3000`/`8000` publicly when Caddy is fronting), cloud **managed DB backups** if you move off the compose Postgres volume, legal/privacy pages for a public product, and tuning alert rules in Sentry or your host.
 
 ### Alembic: `relation "albums" already exists` (or other “already exists”)
 

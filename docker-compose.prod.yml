@@ -1,3 +1,6 @@
+# Optional merge files (from repo root): deploy/docker-compose.caddy.yml, deploy/docker-compose.secrets.yml,
+# deploy/docker-compose.backup.yml — see deploy/README.md
+
 services:
   db:
     image: postgres:16-alpine
@@ -40,6 +43,8 @@ services:
       ENVIRONMENT: production
       # Optional: comma-separated API hostnames for TrustedHostMiddleware (e.g. api.example.com)
       TRUSTED_HOSTS: ${TRUSTED_HOSTS:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0}
     ports: ["8000:8000"]
     healthcheck:
       test:

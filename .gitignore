@@ -9,3 +9,10 @@ api/.env
 node_modules/
 web/.next/
 web/node_modules/
+
+# Production deploy artifacts (never commit real secrets)
+secrets/*.txt
+!secrets/.gitkeep
+data/pg-backups/
+caddy.env
+deploy/caddy.env
