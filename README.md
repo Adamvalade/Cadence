@@ -37,13 +37,20 @@ Or one shot: `./bin/setup.sh --dev` (setup + then same as `dev.sh`).
 
 Copy `api/.env.example` → `api/.env` and set `DATABASE_URL`, `SECRET_KEY`, optional Spotify keys, and `FRONTEND_URL=http://localhost:3000`. Postgres in Docker is on host port **5433** by default (`DATABASE_URL` in `.env.example` matches).
 
-### Alembic: `relation "albums" already exists`
+### Alembic: `relation "albums" already exists` (or other “already exists”)
 
-That means the database **already has tables** (e.g. from tests or manual `create_all`) but **`alembic_version` is empty**, so `upgrade` tries to run the initial migration again.
+The database **already has tables** but **`alembic_version` is empty or behind**, so `alembic upgrade head` tries to create objects that are already there. That also breaks the API if the code expects columns your DB does not have yet (e.g. search touching `albums`).
 
-- If the schema already matches the latest migration (you have `listen_statuses`, etc.):  
-  `cd api && source .venv/bin/activate && alembic stamp head`
-- If you only have the older tables and are missing a later migration:  
-  `alembic stamp 225104d8ff02` then `alembic upgrade head`
+**Prefer:** run `./bin/setup.sh` again — it stamps the revision Alembic was trying to apply, then retries `upgrade head` in a loop.
 
-After stamping, `alembic current` should show `ab35e8d933c3 (head)` (or whatever `head` is in your repo).
+**Manual recovery:** stamp the **target** revision from the error line `Running upgrade … -> REV`, then upgrade again. Example if the first failure is on the initial migration:
+
+`cd api && source .venv/bin/activate && alembic stamp 225104d8ff02 && alembic upgrade head`
+
+If the next error is `listen_statuses` already exists:
+
+`alembic stamp ab35e8d933c3 && alembic upgrade head`
+
+Repeat until `alembic upgrade head` succeeds. Avoid `alembic stamp head` unless you are sure every migration’s DDL is already applied — otherwise you can skip real migrations.
+
+`alembic current` should end on the same revision as `alembic heads`.

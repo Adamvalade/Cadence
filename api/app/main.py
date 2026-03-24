@@ -54,9 +54,10 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    from app.routers import auth, users, albums, reviews, follows, feed, lists, listen_status, discover
+    from app.routers import auth, users, albums, reviews, follows, feed, lists, listen_status, discover, spotify_catalog
 
     app.include_router(auth.router, prefix="/auth", tags=["auth"])
+    app.include_router(spotify_catalog.router, prefix="/spotify", tags=["spotify"])
     app.include_router(users.router, prefix="/users", tags=["users"])
     app.include_router(albums.router, prefix="/albums", tags=["albums"])
     app.include_router(reviews.router, prefix="/reviews", tags=["reviews"])

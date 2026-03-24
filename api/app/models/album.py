@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Integer, String, func
+from sqlalchemy import DateTime, Integer, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -19,6 +19,7 @@ class Album(Base):
     cover_image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     genre: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    tracks_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     reviews: Mapped[list["Review"]] = relationship(back_populates="album", lazy="selectin")  # noqa: F821
     tracks: Mapped[list["Track"]] = relationship(back_populates="album", lazy="selectin")  # noqa: F821

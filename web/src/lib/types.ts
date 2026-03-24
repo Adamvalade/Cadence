@@ -6,6 +6,24 @@ export interface UserBrief {
   avatar_url: string | null;
 }
 
+export interface UserRatingStats {
+  album_ratings_count: number;
+  album_ratings_average: number | null;
+  song_ratings_count: number;
+  song_ratings_average: number | null;
+  combined_rating_distribution: Record<string, number>;
+}
+
+export interface FeaturedTrackPublic {
+  slot: number;
+  spotify_track_id: string;
+  title: string;
+  artist: string;
+  album_title: string | null;
+  cover_image_url: string | null;
+  open_url: string;
+}
+
 export interface UserProfile {
   id: string;
   username: string;
@@ -16,6 +34,16 @@ export interface UserProfile {
   review_count: number;
   follower_count: number;
   following_count: number;
+  rating_stats: UserRatingStats;
+  featured_tracks: FeaturedTrackPublic[];
+}
+
+export interface TrackSearchResult {
+  spotify_track_id: string;
+  title: string;
+  artist: string;
+  album_title: string | null;
+  cover_image_url: string | null;
 }
 
 export interface Album {

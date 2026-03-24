@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Music } from "lucide-react";
+import { ChevronLeft, Music } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -88,7 +88,12 @@ export default function AlbumDetailPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="flex flex-col md:flex-row gap-8">
+      <Button variant="ghost" size="sm" className="mb-6 -ml-2 text-muted-foreground" render={<Link href="/search" />}>
+        <ChevronLeft className="h-4 w-4" />
+        Back to search
+      </Button>
+
+      <div className="rounded-xl border border-border bg-card p-6 md:p-8 flex flex-col md:flex-row gap-8">
         <div className="shrink-0">
           <div className="w-64 h-64 rounded-lg overflow-hidden bg-muted relative mx-auto md:mx-0">
             {album.cover_image_url ? (
@@ -154,7 +159,7 @@ export default function AlbumDetailPage() {
 
       <Separator className="my-8" />
 
-      <div>
+      <div className="rounded-xl border border-border bg-card p-6">
         <h2 className="text-xl font-semibold mb-4">Reviews</h2>
         {reviews.length === 0 ? (
           <p className="text-muted-foreground">No reviews yet. Be the first!</p>

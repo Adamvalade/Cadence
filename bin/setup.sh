@@ -50,19 +50,33 @@ if [ ! -f "$API_DIR/.env" ]; then
 fi
 
 echo "  Running database migrations..."
-set +e
-_migrate_out="$(alembic upgrade head 2>&1)"
-_migrate_status=$?
-set -e
-if [ "$_migrate_status" -ne 0 ]; then
-  # DB often already has tables (e.g. from tests) while alembic_version is empty
-  if echo "$_migrate_out" | grep -q "already exists"; then
-    echo "  Existing tables found without Alembic history; stamping head..."
-    alembic stamp head
+_migrate_status=1
+_max_attempts=8
+for _attempt in $(seq 1 "$_max_attempts"); do
+  set +e
+  _migrate_out="$(alembic upgrade head 2>&1)"
+  _migrate_status=$?
+  set -e
+  if [ "$_migrate_status" -eq 0 ]; then
+    printf '%s\n' "$_migrate_out"
+    break
+  fi
+  printf '%s\n' "$_migrate_out"
+  if echo "$_migrate_out" | grep -qiE 'already exists|DuplicateTable'; then
+    _target="$(printf '%s\n' "$_migrate_out" | grep 'Running upgrade' | tail -1 | sed -n 's/.*Running upgrade[[:space:]]*->[[:space:]]*\([a-f0-9]*\).*/\1/p')"
+    if [ -z "$_target" ]; then
+      echo "  Duplicate tables but could not parse Alembic target revision. See README (Alembic)."
+      exit 1
+    fi
+    echo "  Schema already includes revision $_target; stamping it and retrying upgrade..."
+    alembic stamp "$_target"
   else
-    echo "$_migrate_out"
     exit "$_migrate_status"
   fi
+done
+if [ "$_migrate_status" -ne 0 ]; then
+  echo "  Migrations failed after $_max_attempts attempts."
+  exit 1
 fi
 
 # ── Frontend setup ───────────────────────────────────────────────────

@@ -1,8 +1,9 @@
 import logging
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -71,32 +72,50 @@ async def search_albums(q: str = Query(min_length=1), db: AsyncSession = Depends
     return results
 
 
-async def _ensure_tracks_synced(db: AsyncSession, album: Album) -> None:
-    existing_count = await db.scalar(select(func.count()).select_from(Track).where(Track.album_id == album.id))
+async def _ensure_tracks_synced(db: AsyncSession, album: Album, album_pk: uuid.UUID) -> None:
+    """Use album_pk for FK filters — album may expire after commit(); lazy-loading album.id breaks async."""
+    existing_count = await db.scalar(select(func.count()).select_from(Track).where(Track.album_id == album_pk))
     if existing_count and existing_count > 0:
         return
-    if not album.spotify_id:
+
+    if album.tracks_synced_at is not None:
         return
+
+    now = datetime.now(timezone.utc)
+
+    if not album.spotify_id:
+        album.tracks_synced_at = now
+        await db.commit()
+        await db.refresh(album)
+        return
+
     spotify = SpotifyService()
     try:
         raw = spotify.get_album_tracks(album.spotify_id)
     except Exception:
-        logger.exception("Spotify album_tracks failed for album id=%s", album.id)
+        logger.exception("Spotify album_tracks failed for album id=%s", album_pk)
         return
+
     if not raw:
+        album.tracks_synced_at = now
+        await db.commit()
+        await db.refresh(album)
         return
+
     for t in raw:
         db.add(
             Track(
-                album_id=album.id,
+                album_id=album_pk,
                 spotify_track_id=t["spotify_track_id"],
                 title=(t["title"] or "Unknown")[:500],
                 disc_number=t["disc_number"],
                 track_number=t["track_number"],
             )
         )
+    album.tracks_synced_at = now
     try:
         await db.commit()
+        await db.refresh(album)
     except IntegrityError:
         await db.rollback()
 
@@ -104,19 +123,27 @@ async def _ensure_tracks_synced(db: AsyncSession, album: Album) -> None:
 @router.get("/{album_id}/tracks", response_model=AlbumTracksPayload)
 async def get_album_tracks(
     album_id: str,
+    refresh: bool = Query(default=False),
     db: AsyncSession = Depends(get_db),
     current_user: User | None = Depends(get_optional_user),
 ):
-    result = await db.execute(select(Album).where(Album.id == uuid.UUID(album_id)))
+    aid = uuid.UUID(album_id)
+    result = await db.execute(select(Album).where(Album.id == aid))
     album = result.scalar_one_or_none()
     if not album:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Album not found")
 
-    await _ensure_tracks_synced(db, album)
+    if refresh:
+        await db.execute(delete(Track).where(Track.album_id == aid))
+        album.tracks_synced_at = None
+        await db.commit()
+        await db.refresh(album)
+
+    await _ensure_tracks_synced(db, album, aid)
 
     tracks_result = await db.execute(
         select(Track)
-        .where(Track.album_id == album.id)
+        .where(Track.album_id == aid)
         .order_by(Track.disc_number, Track.track_number, Track.title)
     )
     track_list = list(tracks_result.scalars().all())
@@ -237,7 +264,6 @@ async def create_album(
 async def import_from_spotify(
     spotify_id: str,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
 ):
     existing = await db.execute(select(Album).where(Album.spotify_id == spotify_id))
     album = existing.scalar_one_or_none()

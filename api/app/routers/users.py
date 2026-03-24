@@ -1,23 +1,73 @@
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
 from app.models.follow import Follow
 from app.models.review import Review
+from app.models.track_rating import TrackRating
 from app.models.user import User
-from app.schemas.user import UserProfile, UserUpdate
+from app.models.user_featured_track import UserFeaturedTrack
+from app.schemas.user import (
+    FeaturedTrackPublic,
+    FeaturedTracksUpdate,
+    UserProfile,
+    UserRatingStats,
+    UserUpdate,
+)
+from app.services.spotify import SpotifyService
 
 router = APIRouter()
 
 
-@router.get("/{username}", response_model=UserProfile)
-async def get_user_profile(username: str, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.username == username))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+async def _rating_stats_for_user(db: AsyncSession, user_id: uuid.UUID) -> UserRatingStats:
+    rev_q = await db.execute(select(Review.rating).where(Review.user_id == user_id))
+    rev = [row[0] for row in rev_q.all()]
+    tr_q = await db.execute(select(TrackRating.rating).where(TrackRating.user_id == user_id))
+    tr = [row[0] for row in tr_q.all()]
 
+    dist = {str(i): 0 for i in range(1, 11)}
+    for r in rev + tr:
+        k = str(int(r))
+        if k in dist:
+            dist[k] += 1
+
+    def avg(vals: list[int]) -> float | None:
+        return round(sum(vals) / len(vals), 1) if vals else None
+
+    return UserRatingStats(
+        album_ratings_count=len(rev),
+        album_ratings_average=avg(rev),
+        song_ratings_count=len(tr),
+        song_ratings_average=avg(tr),
+        combined_rating_distribution=dist,
+    )
+
+
+async def _featured_public_list(db: AsyncSession, user_id: uuid.UUID) -> list[FeaturedTrackPublic]:
+    r = await db.execute(
+        select(UserFeaturedTrack)
+        .where(UserFeaturedTrack.user_id == user_id)
+        .order_by(UserFeaturedTrack.slot)
+    )
+    rows = list(r.scalars().all())
+    return [
+        FeaturedTrackPublic(
+            slot=x.slot,
+            spotify_track_id=x.spotify_track_id,
+            title=x.title,
+            artist=x.artist,
+            album_title=x.album_title,
+            cover_image_url=x.cover_image_url,
+            open_url=f"https://open.spotify.com/track/{x.spotify_track_id}",
+        )
+        for x in rows
+    ]
+
+
+async def build_user_profile(db: AsyncSession, user: User) -> UserProfile:
     review_count = (await db.execute(select(func.count()).where(Review.user_id == user.id))).scalar() or 0
     follower_count = (
         await db.execute(select(func.count()).where(Follow.following_id == user.id))
@@ -25,6 +75,8 @@ async def get_user_profile(username: str, db: AsyncSession = Depends(get_db)):
     following_count = (
         await db.execute(select(func.count()).where(Follow.follower_id == user.id))
     ).scalar() or 0
+    stats = await _rating_stats_for_user(db, user.id)
+    featured = await _featured_public_list(db, user.id)
 
     return UserProfile(
         id=str(user.id),
@@ -36,7 +88,19 @@ async def get_user_profile(username: str, db: AsyncSession = Depends(get_db)):
         review_count=review_count,
         follower_count=follower_count,
         following_count=following_count,
+        rating_stats=stats,
+        featured_tracks=featured,
     )
+
+
+@router.get("/{username}", response_model=UserProfile)
+async def get_user_profile(username: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.username == username))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    return await build_user_profile(db, user)
 
 
 @router.patch("/me", response_model=UserProfile)
@@ -55,22 +119,46 @@ async def update_my_profile(
     await db.commit()
     await db.refresh(current_user)
 
-    review_count = (await db.execute(select(func.count()).where(Review.user_id == current_user.id))).scalar() or 0
-    follower_count = (
-        await db.execute(select(func.count()).where(Follow.following_id == current_user.id))
-    ).scalar() or 0
-    following_count = (
-        await db.execute(select(func.count()).where(Follow.follower_id == current_user.id))
-    ).scalar() or 0
+    return await build_user_profile(db, current_user)
 
-    return UserProfile(
-        id=str(current_user.id),
-        username=current_user.username,
-        display_name=current_user.display_name,
-        avatar_url=current_user.avatar_url,
-        bio=current_user.bio,
-        created_at=current_user.created_at,
-        review_count=review_count,
-        follower_count=follower_count,
-        following_count=following_count,
-    )
+
+@router.put("/me/featured-tracks", response_model=UserProfile)
+async def update_my_featured_tracks(
+    body: FeaturedTracksUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    await db.execute(delete(UserFeaturedTrack).where(UserFeaturedTrack.user_id == current_user.id))
+
+    spotify = SpotifyService()
+    for slot, spotify_id in enumerate(body.slots):
+        if slot > 4:
+            break
+        if not spotify_id or not str(spotify_id).strip():
+            continue
+        sid = str(spotify_id).strip()
+        meta = spotify.get_track_public_meta(sid)
+        if not meta:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Could not load track from Spotify: {sid}",
+            )
+        at = meta.get("album_title")
+        album_title = (at[:300] if isinstance(at, str) and at.strip() else None)
+        cu = meta.get("cover_image_url")
+        cover = (cu[:500] if isinstance(cu, str) and cu.strip() else None)
+        db.add(
+            UserFeaturedTrack(
+                user_id=current_user.id,
+                slot=slot,
+                spotify_track_id=meta["spotify_track_id"],
+                title=(meta["title"] or "Unknown")[:500],
+                artist=(meta["artist"] or "Unknown")[:300],
+                album_title=album_title,
+                cover_image_url=cover,
+            )
+        )
+
+    await db.commit()
+
+    return await build_user_profile(db, current_user)

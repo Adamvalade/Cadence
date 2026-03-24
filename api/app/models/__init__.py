@@ -7,6 +7,7 @@ from app.models.list import List, ListItem
 from app.models.listen_status import ListenStatus
 from app.models.track import Track
 from app.models.track_rating import TrackRating
+from app.models.user_featured_track import UserFeaturedTrack
 
 __all__ = [
     "User",
@@ -19,4 +20,5 @@ __all__ = [
     "ListenStatus",
     "Track",
     "TrackRating",
+    "UserFeaturedTrack",
 ]

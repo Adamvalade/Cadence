@@ -3,13 +3,16 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import Image from "next/image";
+import { ExternalLink, Music } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ReviewCard from "@/components/ReviewCard";
+import FeaturedTracksEditor from "@/components/FeaturedTracksEditor";
+import RatingDistribution from "@/components/RatingDistribution";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { Review, UserList, UserProfile } from "@/lib/types";
@@ -94,10 +97,14 @@ export default function ProfilePage() {
     }
   };
 
-  const handleDeleteReview = (reviewId: string) => {
+  const handleDeleteReview = async (reviewId: string) => {
     setReviews((prev) => prev.filter((r) => r.id !== reviewId));
-    if (profile) {
-      setProfile({ ...profile, review_count: profile.review_count - 1 });
+    if (!username) return;
+    try {
+      const p = await api.get<UserProfile>(`/users/${username}`);
+      setProfile(p);
+    } catch {
+      /* keep stale stats */
     }
   };
 
@@ -147,13 +154,92 @@ export default function ProfilePage() {
               {isFollowing ? "Unfollow" : "Follow"}
             </Button>
           )}
-          {isOwnProfile && (
-            <Button variant="outline" size="sm" render={<Link href="/settings" />}>Edit profile</Button>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {isOwnProfile && (
+              <>
+                <Button variant="outline" size="sm" render={<Link href="/settings" />}>
+                  Edit profile
+                </Button>
+                <FeaturedTracksEditor profile={profile} onSaved={setProfile} />
+              </>
+            )}
+          </div>
         </div>
       </div>
 
-      <Separator className="my-6" />
+      <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-xs text-muted-foreground uppercase tracking-wide">Album ratings</p>
+          <p className="text-2xl font-semibold tabular-nums mt-1">{profile.rating_stats.album_ratings_count}</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Avg {profile.rating_stats.album_ratings_average ?? "—"}
+            {profile.rating_stats.album_ratings_average != null ? "/10" : ""}
+          </p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-xs text-muted-foreground uppercase tracking-wide">Song ratings</p>
+          <p className="text-2xl font-semibold tabular-nums mt-1">{profile.rating_stats.song_ratings_count}</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Avg {profile.rating_stats.song_ratings_average ?? "—"}
+            {profile.rating_stats.song_ratings_average != null ? "/10" : ""}
+          </p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4 col-span-2 md:col-span-2">
+          <p className="text-xs text-muted-foreground uppercase tracking-wide">All ratings</p>
+          <p className="text-2xl font-semibold tabular-nums mt-1">
+            {profile.rating_stats.album_ratings_count + profile.rating_stats.song_ratings_count}
+          </p>
+          <p className="text-sm text-muted-foreground mt-0.5">Album + per-track scores you&apos;ve given</p>
+        </div>
+      </div>
+
+      {profile.rating_stats.album_ratings_count + profile.rating_stats.song_ratings_count > 0 && (
+        <div className="mt-6 rounded-lg border border-border bg-card p-4">
+          <RatingDistribution distribution={profile.rating_stats.combined_rating_distribution} />
+        </div>
+      )}
+
+      <div className="mt-8">
+        <h2 className="text-lg font-semibold mb-3">Featured songs</h2>
+        {profile.featured_tracks.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {isOwnProfile
+              ? "Show up to 5 songs you’re replaying—use Edit featured songs above."
+              : "No featured songs yet."}
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+            {profile.featured_tracks.map((f) => (
+              <a
+                key={`${f.slot}-${f.spotify_track_id}`}
+                href={f.open_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group rounded-lg border border-border bg-card overflow-hidden hover:bg-accent/40 transition-colors"
+              >
+                <div className="aspect-square bg-muted relative">
+                  {f.cover_image_url ? (
+                    <Image src={f.cover_image_url} alt="" fill className="object-cover" sizes="(max-width:768px) 50vw, 20vw" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Music className="h-10 w-10 text-muted-foreground/50" />
+                    </div>
+                  )}
+                </div>
+                <div className="p-2">
+                  <p className="text-xs font-medium line-clamp-2">{f.title}</p>
+                  <p className="text-[11px] text-muted-foreground line-clamp-1">{f.artist}</p>
+                  <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground mt-1">
+                    Spotify <ExternalLink className="h-2.5 w-2.5" />
+                  </span>
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <Separator className="my-8" />
 
       <Tabs defaultValue="reviews">
         <TabsList>

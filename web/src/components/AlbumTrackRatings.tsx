@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import StarRating from "@/components/StarRating";
+import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import type { AlbumTrackRow, AlbumTracksPayload } from "@/lib/types";
 
@@ -25,22 +26,30 @@ export default function AlbumTrackRatings({
 }) {
   const [data, setData] = useState<AlbumTracksPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [savingTrackId, setSavingTrackId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const payload = await api.get<AlbumTracksPayload>(`/albums/${albumId}/tracks`);
-      setData(payload);
-    } catch {
-      setError("Could not load tracks.");
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [albumId]);
+  const load = useCallback(
+    async (opts?: { refresh?: boolean }) => {
+      const isRefresh = Boolean(opts?.refresh);
+      if (isRefresh) setRefreshing(true);
+      else setLoading(true);
+      setError(null);
+      try {
+        const params = isRefresh ? { refresh: "true" } : undefined;
+        const payload = await api.get<AlbumTracksPayload>(`/albums/${albumId}/tracks`, params);
+        setData(payload);
+      } catch {
+        setError("Could not load tracks.");
+        setData(null);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [albumId]
+  );
 
   useEffect(() => {
     load();
@@ -88,24 +97,41 @@ export default function AlbumTrackRatings({
 
   if (error && !data) {
     return (
-      <p className="text-sm text-destructive" role="alert">
-        {error}
-      </p>
+      <div className="space-y-3">
+        <h2 className="text-xl font-semibold">Tracks</h2>
+        <p className="text-sm text-destructive" role="alert">
+          {error}
+        </p>
+        <Button type="button" variant="outline" size="sm" disabled={refreshing} onClick={() => load({ refresh: true })}>
+          {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Try again from Spotify"}
+        </Button>
+      </div>
     );
   }
 
   if (!data || data.track_count === 0) {
     return (
-      <p className="text-sm text-muted-foreground">
-        No tracks found for this album. If this keeps happening, check Spotify API credentials.
-      </p>
+      <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+        <div>
+          <h2 className="text-xl font-semibold">Tracks</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            No songs loaded for this album yet. This can happen after a sync glitch—reload from Spotify.
+          </p>
+          {!canRate && (
+            <p className="text-sm text-muted-foreground mt-2">Sign in to rate tracks once they appear.</p>
+          )}
+        </div>
+        <Button type="button" variant="outline" size="sm" disabled={refreshing} onClick={() => load({ refresh: true })}>
+          {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Reload tracks from Spotify"}
+        </Button>
+      </div>
     );
   }
 
   let lastDisc: number | null = null;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 rounded-xl border border-border bg-card p-4">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
         <div>
           <h2 className="text-xl font-semibold">Tracks</h2>
@@ -116,13 +142,26 @@ export default function AlbumTrackRatings({
             <p className="text-sm text-muted-foreground mt-2">Sign in to rate individual tracks.</p>
           )}
         </div>
-        {canRate && data.my_rated_count > 0 && data.my_track_average != null && (
-          <p className="text-sm text-muted-foreground tabular-nums">
-            Your song average: <span className="font-medium text-foreground">{data.my_track_average}</span>
-            <span className="text-muted-foreground"> / 10</span>
-            <span className="text-muted-foreground"> ({data.my_rated_count}/{data.track_count} rated)</span>
-          </p>
-        )}
+        <div className="flex flex-col items-start sm:items-end gap-2">
+          {canRate && data.my_rated_count > 0 && data.my_track_average != null && (
+            <p className="text-sm text-muted-foreground tabular-nums">
+              Your song average: <span className="font-medium text-foreground">{data.my_track_average}</span>
+              <span className="text-muted-foreground"> / 10</span>
+              <span className="text-muted-foreground"> ({data.my_rated_count}/{data.track_count} rated)</span>
+            </p>
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-xs h-8"
+            disabled={refreshing}
+            title="Re-downloads tracks from Spotify and clears your per-song ratings for this album."
+            onClick={() => load({ refresh: true })}
+          >
+            {refreshing ? <Loader2 className="h-3 w-3 animate-spin" /> : "Re-sync from Spotify"}
+          </Button>
+        </div>
       </div>
 
       {error && (

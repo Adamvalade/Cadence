@@ -10,6 +10,24 @@ from app.schemas.album import AlbumSearchResult
 # Spotify GET /search: limit max 10 per item type (Web API reference, not Spotipy default).
 _SPOTIFY_SEARCH_LIMIT_MAX = 10
 
+
+def _resolve_spotify_track_id(item: dict) -> str | None:
+    """Album track items often omit `id` or put the real id under `linked_from` (market / linking)."""
+    tid = item.get("id")
+    if isinstance(tid, str) and tid.strip():
+        return tid.strip()
+    linked = item.get("linked_from") or {}
+    if isinstance(linked, dict):
+        lid = linked.get("id")
+        if isinstance(lid, str) and lid.strip():
+            return lid.strip()
+    uri = item.get("uri") or ""
+    if isinstance(uri, str) and uri.startswith("spotify:track:"):
+        parts = uri.split(":")
+        if len(parts) >= 3 and parts[2]:
+            return parts[2]
+    return None
+
 # One client + in-memory token cache: avoids concurrent .cache file corruption when
 # many requests each did SpotifyService() + default CacheFileHandler (same .cache path).
 _init_lock = threading.Lock()
@@ -106,7 +124,7 @@ class SpotifyService:
             )
             items = page.get("items") or []
             for t in items:
-                tid = t.get("id")
+                tid = _resolve_spotify_track_id(t)
                 if not tid:
                     continue
                 out.append(
@@ -123,6 +141,47 @@ class SpotifyService:
             if not items:
                 break
         return out
+
+    def search_tracks(self, query: str, limit: int = _SPOTIFY_SEARCH_LIMIT_MAX) -> list[dict]:
+        if not self._sp:
+            return []
+        lim = max(1, min(int(limit), _SPOTIFY_SEARCH_LIMIT_MAX))
+        market = settings.SPOTIFY_MARKET.strip() or "US"
+        results = self._sp.search(q=query, type="track", limit=lim, offset=0, market=market)
+        items = (results.get("tracks") or {}).get("items") or []
+        out: list[dict] = []
+        for t in items:
+            tid = _resolve_spotify_track_id(t)
+            if not tid:
+                continue
+            alb = t.get("album") or {}
+            out.append(
+                {
+                    "spotify_track_id": tid,
+                    "title": t.get("name") or "Unknown",
+                    "artist": ", ".join(a["name"] for a in t.get("artists", [])),
+                    "album_title": alb.get("name"),
+                    "cover_image_url": self._best_image(alb.get("images") or []),
+                }
+            )
+        return out
+
+    def get_track_public_meta(self, spotify_track_id: str) -> dict | None:
+        if not self._sp:
+            return None
+        market = settings.SPOTIFY_MARKET.strip() or "US"
+        try:
+            t = self._sp.track(spotify_track_id, market=market)
+        except Exception:
+            return None
+        alb = t.get("album") or {}
+        return {
+            "spotify_track_id": t.get("id") or spotify_track_id,
+            "title": t.get("name") or "Unknown",
+            "artist": ", ".join(a["name"] for a in t.get("artists", [])),
+            "album_title": alb.get("name"),
+            "cover_image_url": self._best_image(alb.get("images") or []),
+        }
 
     @staticmethod
     def _parse_year(date_str: str) -> int | None:

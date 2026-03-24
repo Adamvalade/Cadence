@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -12,6 +12,11 @@ import { useTitle } from "@/lib/useTitle";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { api } from "@/lib/api";
+import {
+  clearRecentSearches,
+  pushRecentSearch,
+  readRecentSearches,
+} from "@/lib/recentSearches";
 import type { Album, AlbumSearchResult } from "@/lib/types";
 
 interface UserSearchResult {
@@ -30,37 +35,58 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [tab, setTab] = useState("albums");
+  const [importingSpotifyId, setImportingSpotifyId] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [recent, setRecent] = useState<string[]>([]);
   const router = useRouter();
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim()) return;
+  useEffect(() => {
+    setRecent(readRecentSearches());
+  }, []);
+
+  const executeSearch = async (raw: string) => {
+    const trimmed = raw.trim();
+    if (!trimmed) return;
     setLoading(true);
     setSearched(true);
+    setQuery(trimmed);
 
     const [albums, users] = await Promise.allSettled([
-      api.get<AlbumSearchResult[]>("/albums/search", { q: query }),
-      api.get<UserSearchResult[]>("/discover/users", { q: query }),
+      api.get<AlbumSearchResult[]>("/albums/search", { q: trimmed }),
+      api.get<UserSearchResult[]>("/discover/users", { q: trimmed }),
     ]);
     setAlbumResults(albums.status === "fulfilled" ? albums.value : []);
     setUserResults(users.status === "fulfilled" ? users.value : []);
     setLoading(false);
+
+    pushRecentSearch(trimmed);
+    setRecent(readRecentSearches());
+  };
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    void executeSearch(query);
   };
 
   const handleImport = async (spotifyId: string) => {
+    setImportError(null);
+    setImportingSpotifyId(spotifyId);
     try {
       const album = await api.post<Album>(`/albums/import/${spotifyId}`);
       router.push(`/album/${album.id}`);
-    } catch {
-      // handle error
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : "Could not open this album.");
+    } finally {
+      setImportingSpotifyId(null);
     }
   };
 
   const handleClick = (result: AlbumSearchResult) => {
+    if (importingSpotifyId) return;
     if (result.existing_id) {
       router.push(`/album/${result.existing_id}`);
     } else {
-      handleImport(result.spotify_id);
+      void handleImport(result.spotify_id);
     }
   };
 
@@ -83,6 +109,39 @@ export default function SearchPage() {
         </Button>
       </form>
 
+      {recent.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <p className="text-xs font-medium text-muted-foreground">Recent searches</p>
+            <button
+              type="button"
+              className="text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                clearRecentSearches();
+                setRecent([]);
+              }}
+            >
+              Clear
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {recent.map((term) => (
+              <Button
+                key={term}
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs font-normal"
+                disabled={loading}
+                onClick={() => void executeSearch(term)}
+              >
+                {term}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {loading && (
         <div className="flex justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -96,6 +155,12 @@ export default function SearchPage() {
             <TabsTrigger value="users">Users ({userResults.length})</TabsTrigger>
           </TabsList>
 
+          {importError && (
+            <p className="mt-4 text-sm text-destructive" role="alert">
+              {importError}
+            </p>
+          )}
+
           <TabsContent value="albums" className="mt-4 space-y-2">
             {albumResults.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">
@@ -105,7 +170,7 @@ export default function SearchPage() {
               albumResults.map((result) => (
                 <Card
                   key={result.spotify_id}
-                  className="cursor-pointer hover:bg-accent/50 transition-colors"
+                  className={`cursor-pointer hover:bg-accent/50 transition-colors ${importingSpotifyId === result.spotify_id ? "opacity-70 pointer-events-none" : ""}`}
                   onClick={() => handleClick(result)}
                 >
                   <CardContent className="p-3 flex items-center gap-4">
@@ -131,11 +196,13 @@ export default function SearchPage() {
                         <p className="text-xs text-muted-foreground">{result.release_year}</p>
                       )}
                     </div>
-                    {result.existing_id && (
+                    {importingSpotifyId === result.spotify_id ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
+                    ) : result.existing_id ? (
                       <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
                         In library
                       </span>
-                    )}
+                    ) : null}
                   </CardContent>
                 </Card>
               ))
