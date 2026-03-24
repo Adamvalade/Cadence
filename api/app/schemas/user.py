@@ -12,6 +12,20 @@ class UserRatingStats(BaseModel):
     )
 
 
+class UserTrackRatingPublic(BaseModel):
+    """A single track rating shown on a user profile or review expand."""
+
+    track_id: str
+    spotify_track_id: str
+    title: str
+    disc_number: int
+    track_number: int
+    rating: int
+    album_id: str
+    album_title: str
+    album_artist: str
+
+
 class FeaturedTrackPublic(BaseModel):
     slot: int
     spotify_track_id: str

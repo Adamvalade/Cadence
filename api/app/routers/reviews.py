@@ -10,11 +10,19 @@ from app.models.like import Like
 from app.models.review import Review
 from app.models.user import User
 from app.schemas.review import ReviewCreate, ReviewResponse, ReviewUpdate
+from app.services.review_enrichment import batch_album_track_rating_summaries
 
 router = APIRouter()
 
 
-def _review_response(review: Review, like_count: int = 0, liked_by_me: bool = False) -> ReviewResponse:
+def _review_response(
+    review: Review,
+    like_count: int = 0,
+    liked_by_me: bool = False,
+    *,
+    album_track_rating_count: int = 0,
+    album_track_rating_average: float | None = None,
+) -> ReviewResponse:
     return ReviewResponse(
         id=str(review.id),
         user_id=str(review.user_id),
@@ -31,6 +39,8 @@ def _review_response(review: Review, like_count: int = 0, liked_by_me: bool = Fa
         album_title=review.album.title if review.album else "",
         album_artist=review.album.artist if review.album else "",
         album_cover_url=review.album.cover_image_url if review.album else None,
+        album_track_rating_count=album_track_rating_count,
+        album_track_rating_average=album_track_rating_average,
     )
 
 
@@ -60,7 +70,9 @@ async def create_review(
     db.add(review)
     await db.commit()
     await db.refresh(review)
-    return _review_response(review)
+    summ = await batch_album_track_rating_summaries(db, [review])
+    tc, ta = summ.get((review.user_id, review.album_id), (0, None))
+    return _review_response(review, album_track_rating_count=tc, album_track_rating_average=ta)
 
 
 @router.get("/{review_id}", response_model=ReviewResponse)
@@ -82,7 +94,15 @@ async def get_review(
         )
         liked_by_me = liked.scalar_one_or_none() is not None
 
-    return _review_response(review, like_count=like_count, liked_by_me=liked_by_me)
+    summ = await batch_album_track_rating_summaries(db, [review])
+    tc, ta = summ.get((review.user_id, review.album_id), (0, None))
+    return _review_response(
+        review,
+        like_count=like_count,
+        liked_by_me=liked_by_me,
+        album_track_rating_count=tc,
+        album_track_rating_average=ta,
+    )
 
 
 @router.patch("/{review_id}", response_model=ReviewResponse)
@@ -108,7 +128,9 @@ async def update_review(
 
     await db.commit()
     await db.refresh(review)
-    return _review_response(review)
+    summ = await batch_album_track_rating_summaries(db, [review])
+    tc, ta = summ.get((review.user_id, review.album_id), (0, None))
+    return _review_response(review, album_track_rating_count=tc, album_track_rating_average=ta)
 
 
 @router.delete("/{review_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -157,6 +179,7 @@ async def get_reviews(
     )
     reviews = result.scalars().all()
 
+    summ = await batch_album_track_rating_summaries(db, reviews)
     items = []
     for r in reviews:
         like_count = (await db.execute(select(func.count()).where(Like.review_id == r.id))).scalar() or 0
@@ -166,7 +189,16 @@ async def get_reviews(
                 select(Like).where(Like.review_id == r.id, Like.user_id == current_user.id)
             )
             liked_by_me = liked.scalar_one_or_none() is not None
-        items.append(_review_response(r, like_count=like_count, liked_by_me=liked_by_me))
+        tc, ta = summ.get((r.user_id, r.album_id), (0, None))
+        items.append(
+            _review_response(
+                r,
+                like_count=like_count,
+                liked_by_me=liked_by_me,
+                album_track_rating_count=tc,
+                album_track_rating_average=ta,
+            )
+        )
     return items
 
 

@@ -82,25 +82,25 @@ export default function FeedPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold mb-6">Your Feed</h1>
+      <div className="max-w-2xl mx-auto px-3 py-5 sm:px-4 sm:py-6">
+        <h1 className="text-xl font-bold mb-4 sm:text-2xl sm:mb-5">Your Feed</h1>
         <FeedSkeleton />
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">Your Feed</h1>
+    <div className="max-w-2xl mx-auto px-3 py-5 sm:px-4 sm:py-6">
+      <h1 className="text-xl font-bold mb-4 sm:text-2xl sm:mb-5">Your Feed</h1>
 
       {error ? (
-        <div className="text-center py-12 space-y-3">
+        <div className="text-center py-8 space-y-3">
           <p className="text-destructive font-medium">Something went wrong</p>
           <p className="text-sm text-muted-foreground">{error}</p>
           <Button variant="outline" onClick={() => loadFeed()}>Try again</Button>
         </div>
       ) : reviews.length === 0 ? (
-        <div className="text-center py-16 space-y-4">
+        <div className="text-center py-10 space-y-3 sm:py-12">
           <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center">
             <Music className="h-8 w-8 text-muted-foreground/50" />
           </div>
@@ -116,13 +116,13 @@ export default function FeedPage() {
           </div>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {reviews.map((review) => (
             <ReviewCard key={review.id} review={review} onDelete={handleDeleteReview} />
           ))}
 
           {hasMore && (
-            <div className="flex justify-center pt-4">
+            <div className="flex justify-center pt-3">
               <Button variant="outline" onClick={() => loadFeed(cursor)} disabled={loadingMore}>
                 {loadingMore ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />

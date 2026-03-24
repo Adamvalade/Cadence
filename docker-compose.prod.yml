@@ -30,7 +30,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://cadence:${POSTGRES_PASSWORD}@db:5432/cadence
       REDIS_URL: redis://redis:6379
-      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY}
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY - min 32 chars for production}
       SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
       SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
       SPOTIFY_REDIRECT_URI: ${SPOTIFY_REDIRECT_URI:-}
@@ -38,14 +38,28 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       ENVIRONMENT: production
+      # Optional: comma-separated API hostnames for TrustedHostMiddleware (e.g. api.example.com)
+      TRUSTED_HOSTS: ${TRUSTED_HOSTS:-}
     ports: ["8000:8000"]
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import urllib.request; r=urllib.request.urlopen(\"http://127.0.0.1:8000/health\", timeout=5); exit(0 if r.status==200 else 1)"',
+        ]
+      interval: 15s
+      timeout: 8s
+      retries: 5
+      start_period: 90s
 
   web:
     build:
       context: ./web
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-    depends_on: [api]
+    depends_on:
+      api:
+        condition: service_healthy
     ports: ["3000:3000"]
 
 volumes:

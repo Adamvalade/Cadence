@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Heart, MoreHorizontal, Music, Pencil, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Heart, Loader2, MoreHorizontal, Music, Pencil, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,8 @@ import StarRating from "@/components/StarRating";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
-import type { Review } from "@/lib/types";
+import type { Review, UserTrackRatingEntry } from "@/lib/types";
+import { formatAverageRatingLabel, formatStoredRatingLabel } from "@/lib/ratingDisplay";
 
 interface ReviewCardProps {
   review: Review;
@@ -40,8 +41,31 @@ export default function ReviewCard({ review, showAlbum = true, onDelete, onUpdat
   const [likeCount, setLikeCount] = useState(review.like_count);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [songPanelOpen, setSongPanelOpen] = useState(false);
+  const [songRows, setSongRows] = useState<UserTrackRatingEntry[] | undefined>(undefined);
+  const [songRowsLoading, setSongRowsLoading] = useState(false);
 
   const isOwn = user?.id === review.user_id;
+  const songCount = review.album_track_rating_count ?? 0;
+
+  const toggleSongPanel = async () => {
+    const next = !songPanelOpen;
+    setSongPanelOpen(next);
+    if (next && songRows === undefined && songCount > 0) {
+      setSongRowsLoading(true);
+      try {
+        const data = await api.get<UserTrackRatingEntry[]>(`/users/${review.username}/track-ratings`, {
+          album_id: review.album_id,
+          limit: "100",
+        });
+        setSongRows(data);
+      } catch {
+        setSongRows([]);
+      } finally {
+        setSongRowsLoading(false);
+      }
+    }
+  };
 
   const toggleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -75,8 +99,8 @@ export default function ReviewCard({ review, showAlbum = true, onDelete, onUpdat
   return (
     <>
       <Card>
-        <CardContent className="p-4">
-          <div className="flex gap-4">
+        <CardContent className="p-3 sm:p-3.5">
+          <div className="flex gap-3 sm:gap-3.5">
             {showAlbum && (
               <Link href={`/album/${review.album_id}`} className="shrink-0">
                 <div className="w-20 h-20 rounded-md overflow-hidden bg-muted relative">
@@ -145,6 +169,69 @@ export default function ReviewCard({ review, showAlbum = true, onDelete, onUpdat
               </div>
 
               <StarRating value={review.rating} size="sm" readonly />
+
+              {songCount > 0 && review.album_track_rating_average != null && (
+                <div className="rounded-md border border-border/60 bg-muted/30">
+                  <button
+                    type="button"
+                    onClick={() => void toggleSongPanel()}
+                    className="flex w-full items-center gap-2 px-2.5 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+                  >
+                    {songPanelOpen ? (
+                      <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                    ) : (
+                      <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                    )}
+                    <span>
+                      <span className="font-medium text-foreground/90">
+                        {songCount} song{songCount === 1 ? "" : "s"} rated
+                      </span>{" "}
+                      on this album · track avg{" "}
+                      <span className="font-medium text-foreground">
+                        {formatAverageRatingLabel(review.album_track_rating_average)}
+                      </span>
+                      <span className="text-muted-foreground"> — show which</span>
+                    </span>
+                  </button>
+                  {songPanelOpen && (
+                    <div className="border-t border-border/50 px-2.5 pb-2.5 pt-1">
+                      {songRowsLoading && (
+                        <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Loading…
+                        </div>
+                      )}
+                      {!songRowsLoading && songRows && songRows.length === 0 && (
+                        <p className="py-1 text-xs text-muted-foreground">Couldn&apos;t load track list.</p>
+                      )}
+                      {!songRowsLoading && songRows && songRows.length > 0 && (
+                        <ul className="max-h-52 space-y-1 overflow-y-auto text-xs">
+                          {songRows.map((t) => (
+                            <li
+                              key={t.track_id}
+                              className="flex justify-between gap-2 border-b border-border/30 py-1 last:border-0"
+                            >
+                              <span className="min-w-0 truncate text-foreground/90">
+                                {t.disc_number > 1 ? `${t.disc_number}.` : ""}
+                                {t.track_number}. {t.title}
+                              </span>
+                              <span className="shrink-0 tabular-nums text-muted-foreground">
+                                {formatStoredRatingLabel(t.rating)}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <Link
+                        href={`/album/${review.album_id}`}
+                        className="mt-2 inline-block text-xs underline underline-offset-2 text-muted-foreground hover:text-foreground"
+                      >
+                        Open album page
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {review.body && (
                 <p className="text-sm text-muted-foreground line-clamp-3">{review.body}</p>

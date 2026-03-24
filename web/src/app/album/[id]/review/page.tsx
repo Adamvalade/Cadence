@@ -158,6 +158,7 @@ export default function ReviewPage() {
 
             <div className="space-y-2">
               <Label>Rating</Label>
+              <p className="text-xs text-muted-foreground">Up to 5 stars; tap left or right half of a star for half steps.</p>
               <StarRating value={rating} onChange={setRating} size="lg" />
             </div>
 

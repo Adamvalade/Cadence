@@ -8,6 +8,7 @@ from app.models.follow import Follow
 from app.models.like import Like
 from app.models.review import Review
 from app.schemas.review import ReviewResponse
+from app.services.review_enrichment import batch_album_track_rating_summaries
 
 
 async def get_feed_items(
@@ -42,6 +43,7 @@ async def get_feed_items(
 
     next_cursor = reviews[-1].created_at.isoformat() if has_more and reviews else None
 
+    summ = await batch_album_track_rating_summaries(db, reviews)
     items = []
     for review in reviews:
         like_count = (await db.execute(select(func.count()).where(Like.review_id == review.id))).scalar() or 0
@@ -49,6 +51,7 @@ async def get_feed_items(
             select(Like).where(Like.review_id == review.id, Like.user_id == user_id)
         )
         liked_by_me = liked.scalar_one_or_none() is not None
+        tc, ta = summ.get((review.user_id, review.album_id), (0, None))
 
         items.append(
             ReviewResponse(
@@ -67,6 +70,8 @@ async def get_feed_items(
                 album_title=review.album.title if review.album else "",
                 album_artist=review.album.artist if review.album else "",
                 album_cover_url=review.album.cover_image_url if review.album else None,
+                album_track_rating_count=tc,
+                album_track_rating_average=ta,
             )
         )
 

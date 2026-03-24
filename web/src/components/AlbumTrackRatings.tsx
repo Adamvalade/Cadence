@@ -6,6 +6,7 @@ import StarRating from "@/components/StarRating";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import type { AlbumTrackRow, AlbumTracksPayload } from "@/lib/types";
+import { formatAverageRatingLabel } from "@/lib/ratingDisplay";
 
 function recomputeSummary(tracks: AlbumTracksPayload["tracks"]): Pick<AlbumTracksPayload, "my_rated_count" | "my_track_average"> {
   const rated = tracks.filter((t) => t.my_rating != null).map((t) => t.my_rating as number);
@@ -136,7 +137,7 @@ export default function AlbumTrackRatings({
         <div>
           <h2 className="text-xl font-semibold">Tracks</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Rate songs 1–10. Your album review is separate and still drives the feed.
+            Rate songs up to 5 stars (half-star steps). Your album review is separate and still drives the feed.
           </p>
           {!canRate && (
             <p className="text-sm text-muted-foreground mt-2">Sign in to rate individual tracks.</p>
@@ -145,8 +146,10 @@ export default function AlbumTrackRatings({
         <div className="flex flex-col items-start sm:items-end gap-2">
           {canRate && data.my_rated_count > 0 && data.my_track_average != null && (
             <p className="text-sm text-muted-foreground tabular-nums">
-              Your song average: <span className="font-medium text-foreground">{data.my_track_average}</span>
-              <span className="text-muted-foreground"> / 10</span>
+              Your song average:{" "}
+              <span className="font-medium text-foreground">
+                {formatAverageRatingLabel(data.my_track_average)}
+              </span>
               <span className="text-muted-foreground"> ({data.my_rated_count}/{data.track_count} rated)</span>
             </p>
           )}

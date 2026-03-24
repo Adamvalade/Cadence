@@ -13,6 +13,7 @@ from app.models.review import Review
 from app.models.user import User
 from app.schemas.album import AlbumResponse
 from app.schemas.review import ReviewResponse
+from app.services.review_enrichment import batch_album_track_rating_summaries
 
 router = APIRouter()
 
@@ -88,6 +89,8 @@ async def popular_reviews(
         .order_by(subquery.c.cnt.desc())
     )
     rows = result.all()
+    reviews_only = [r for r, _ in rows]
+    summ = await batch_album_track_rating_summaries(db, reviews_only)
 
     items = []
     for review, like_count in rows:
@@ -98,6 +101,7 @@ async def popular_reviews(
             )
             liked_by_me = liked.scalar_one_or_none() is not None
 
+        tc, ta = summ.get((review.user_id, review.album_id), (0, None))
         items.append(ReviewResponse(
             id=str(review.id),
             user_id=str(review.user_id),
@@ -114,6 +118,8 @@ async def popular_reviews(
             album_title=review.album.title if review.album else "",
             album_artist=review.album.artist if review.album else "",
             album_cover_url=review.album.cover_image_url if review.album else None,
+            album_track_rating_count=tc,
+            album_track_rating_average=ta,
         ))
     return items
 
@@ -129,6 +135,7 @@ async def recent_reviews(
         select(Review).order_by(Review.created_at.desc()).limit(limit)
     )
     reviews = result.scalars().all()
+    summ = await batch_album_track_rating_summaries(db, reviews)
 
     items = []
     for review in reviews:
@@ -143,6 +150,7 @@ async def recent_reviews(
             )
             liked_by_me = liked.scalar_one_or_none() is not None
 
+        tc, ta = summ.get((review.user_id, review.album_id), (0, None))
         items.append(ReviewResponse(
             id=str(review.id),
             user_id=str(review.user_id),
@@ -159,6 +167,8 @@ async def recent_reviews(
             album_title=review.album.title if review.album else "",
             album_artist=review.album.artist if review.album else "",
             album_cover_url=review.album.cover_image_url if review.album else None,
+            album_track_rating_count=tc,
+            album_track_rating_average=ta,
         ))
     return items
 

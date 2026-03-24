@@ -7,8 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from app.core.config import settings
+from app.core.config import settings, validate_production_settings
+from app.core.http_middleware import RequestIdMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +20,27 @@ async def lifespan(app: FastAPI):
     yield
 
 
+async def _redis_reachable() -> bool:
+    try:
+        import redis.asyncio as redis
+
+        client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+        try:
+            return bool(await client.ping())
+        finally:
+            await client.aclose()
+    except Exception:
+        return False
+
+
 def create_app() -> FastAPI:
-    app = FastAPI(title="Cadence API", lifespan=lifespan)
+    validate_production_settings()
+
+    doc_kwargs = {}
+    if settings.is_production:
+        doc_kwargs = {"docs_url": None, "redoc_url": None, "openapi_url": None}
+
+    app = FastAPI(title="Cadence API", lifespan=lifespan, **doc_kwargs)
 
     @app.exception_handler(ValueError)
     async def value_error_handler(request: Request, exc: ValueError):
@@ -39,7 +60,8 @@ def create_app() -> FastAPI:
 
             return await response_validation_exception_handler(request, exc)
 
-        logger.exception("Unhandled exception")
+        rid = getattr(request.state, "request_id", None)
+        logger.exception("Unhandled exception", extra={"request_id": rid})
         return JSONResponse(
             status_code=500,
             content={"detail": "Internal server error"},
@@ -53,6 +75,9 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(RequestIdMiddleware)
+    if settings.is_production and settings.trusted_hosts_list:
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.trusted_hosts_list)
 
     from app.routers import auth, users, albums, reviews, follows, feed, lists, listen_status, discover, spotify_catalog
 
@@ -69,16 +94,19 @@ def create_app() -> FastAPI:
 
     @app.get("/")
     async def root():
-        return {
+        payload = {
             "service": "cadence-api",
-            "docs": "/docs",
             "health": "/health",
             "hint": "The web app runs separately (e.g. http://localhost:3000).",
         }
+        if not settings.is_production:
+            payload["docs"] = "/docs"
+        return payload
 
     @app.get("/health")
     async def health():
         from sqlalchemy import text
+
         from app.db.session import async_session
 
         db_ok = False
@@ -89,10 +117,17 @@ def create_app() -> FastAPI:
         except Exception:
             pass
 
-        return {
+        redis_ok = await _redis_reachable()
+
+        body = {
             "ok": db_ok,
             "service": "cadence-api",
             "database": "connected" if db_ok else "unavailable",
+            "redis": "connected" if redis_ok else "unavailable",
         }
+        return JSONResponse(
+            status_code=200 if db_ok else 503,
+            content=body,
+        )
 
     return app

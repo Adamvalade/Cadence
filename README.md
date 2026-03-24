@@ -37,6 +37,22 @@ Or one shot: `./bin/setup.sh --dev` (setup + then same as `dev.sh`).
 
 Copy `api/.env.example` → `api/.env` and set `DATABASE_URL`, `SECRET_KEY`, optional Spotify keys, and `FRONTEND_URL=http://localhost:3000`. Postgres in Docker is on host port **5433** by default (`DATABASE_URL` in `.env.example` matches).
 
+## Production
+
+**Stack:** `docker compose -f docker-compose.prod.yml up --build` runs Postgres, Redis, API, and Next. The API image **runs `alembic upgrade head` on startup** before serving traffic. With **multiple API replicas**, run migrations from a single job or one instance only—parallel upgrades can race.
+
+**Required environment (see `api/.env.example`):**
+
+- Set `ENVIRONMENT=production` on the API (already set in `docker-compose.prod.yml`).
+- **`SECRET_KEY`:** at least 32 characters, not a known placeholder (the API refuses to start otherwise).
+- **`FRONTEND_URL`:** public browser origin with **`https://`** (except `http://localhost` / `http://127.0.0.1` for local compose smoke tests). Must match CORS and OAuth redirect configuration exactly.
+- **`NEXT_PUBLIC_API_URL`:** the **public** API base URL your browser will call (usually `https://…`, baked in at Next build time).
+- Spotify / Google redirect URIs must include your production API callback URLs.
+
+**Hardening already in place:** OpenAPI `/docs` is disabled in production; `X-Request-ID` on responses; optional **`TRUSTED_HOSTS`** (comma-separated) enables `TrustedHostMiddleware`; `/health` checks Postgres and reports Redis; Next adds baseline security headers (frame deny, nosniff, referrer policy, permissions policy). [Dependabot](.github/dependabot.yml) is configured for `api`, `web`, and GitHub Actions.
+
+**Still your responsibility:** TLS termination (reverse proxy or platform edge), Postgres backups, strong unique secrets in a secret store, and monitoring/alerting (e.g. Sentry) if you want error aggregation.
+
 ### Alembic: `relation "albums" already exists` (or other “already exists”)
 
 The database **already has tables** but **`alembic_version` is empty or behind**, so `alembic upgrade head` tries to create objects that are already there. That also breaks the API if the code expects columns your DB does not have yet (e.g. search touching `albums`).

@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { formatDistributionStepLabel } from "@/lib/ratingDisplay";
 
 export default function RatingDistribution({
   distribution,
@@ -13,23 +14,38 @@ export default function RatingDistribution({
     const k = String(i + 1);
     return { rating: i + 1, count: distribution[k] ?? 0 };
   });
-  const max = Math.max(1, ...entries.map((e) => e.count));
+  const total = entries.reduce((s, e) => s + e.count, 0);
+  const max = Math.max(...entries.map((e) => e.count), 1);
+  /** Pixel height — avoids broken % heights inside flex columns without a fixed track. */
+  const maxBarPx = 80;
 
   return (
     <div className={cn("space-y-2", className)}>
-      <p className="text-sm font-medium">Rating spread (album + song scores)</p>
-      <div className="flex items-end gap-1 h-28">
-        {entries.map(({ rating, count }) => (
-          <div key={rating} className="flex-1 flex flex-col items-center gap-1 min-w-0">
+      <p className="text-sm font-medium">Rating spread (album + song scores, out of 5★)</p>
+      <div className="flex items-end justify-between gap-1 sm:gap-1.5 h-[5.5rem]">
+        {entries.map(({ rating, count }) => {
+          const h = Math.round((count / max) * maxBarPx);
+          const barHeightPx = count === 0 ? 2 : Math.max(h, 4);
+          return (
             <div
-              className="w-full rounded-t bg-primary/80 min-h-px transition-all"
-              style={{ height: `${(count / max) * 100}%` }}
-              title={`${rating}/10: ${count}`}
-            />
-            <span className="text-[10px] text-muted-foreground tabular-nums">{rating}</span>
-          </div>
-        ))}
+              key={rating}
+              className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1"
+            >
+              <div
+                className="w-full max-w-[1.35rem] sm:max-w-none rounded-t bg-primary/85 transition-all"
+                style={{ height: `${barHeightPx}px`, minHeight: count > 0 ? 4 : 2 }}
+                title={`${formatDistributionStepLabel(rating)}★: ${count}`}
+              />
+              <span className="text-[10px] tabular-nums leading-none text-muted-foreground">
+                {formatDistributionStepLabel(rating)}
+              </span>
+            </div>
+          );
+        })}
       </div>
+      {total === 0 && (
+        <p className="text-xs text-muted-foreground">No ratings yet — album and track scores will appear here.</p>
+      )}
     </div>
   );
 }

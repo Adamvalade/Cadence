@@ -127,6 +127,10 @@ async def get_album_tracks(
     db: AsyncSession = Depends(get_db),
     current_user: User | None = Depends(get_optional_user),
 ):
+    # Capture before any commit() — commits expire ORM instances; accessing current_user.id later can
+    # trigger a sync lazy load and raise MissingGreenlet in async SQLAlchemy.
+    viewer_id: uuid.UUID | None = current_user.id if current_user else None
+
     aid = uuid.UUID(album_id)
     result = await db.execute(select(Album).where(Album.id == aid))
     album = result.scalar_one_or_none()
@@ -149,11 +153,11 @@ async def get_album_tracks(
     track_list = list(tracks_result.scalars().all())
 
     ratings_map: dict[uuid.UUID, int] = {}
-    if current_user and track_list:
+    if viewer_id is not None and track_list:
         ids = [t.id for t in track_list]
         ratings_rows = await db.execute(
             select(TrackRating).where(
-                TrackRating.user_id == current_user.id,
+                TrackRating.user_id == viewer_id,
                 TrackRating.track_id.in_(ids),
             )
         )
@@ -190,6 +194,7 @@ async def upsert_track_rating(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    uid = current_user.id
     album_result = await db.execute(select(Album).where(Album.id == uuid.UUID(album_id)))
     if not album_result.scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Album not found")
@@ -202,7 +207,7 @@ async def upsert_track_rating(
 
     existing = await db.execute(
         select(TrackRating).where(
-            TrackRating.user_id == current_user.id,
+            TrackRating.user_id == uid,
             TrackRating.track_id == track.id,
         )
     )
@@ -210,7 +215,7 @@ async def upsert_track_rating(
     if row:
         row.rating = body.rating
     else:
-        row = TrackRating(user_id=current_user.id, track_id=track.id, rating=body.rating)
+        row = TrackRating(user_id=uid, track_id=track.id, rating=body.rating)
         db.add(row)
     await db.commit()
     await db.refresh(row)

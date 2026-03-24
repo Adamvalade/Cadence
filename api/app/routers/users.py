@@ -1,12 +1,14 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
+from app.models.album import Album
 from app.models.follow import Follow
 from app.models.review import Review
+from app.models.track import Track
 from app.models.track_rating import TrackRating
 from app.models.user import User
 from app.models.user_featured_track import UserFeaturedTrack
@@ -15,6 +17,7 @@ from app.schemas.user import (
     FeaturedTracksUpdate,
     UserProfile,
     UserRatingStats,
+    UserTrackRatingPublic,
     UserUpdate,
 )
 from app.services.spotify import SpotifyService
@@ -91,6 +94,52 @@ async def build_user_profile(db: AsyncSession, user: User) -> UserProfile:
         rating_stats=stats,
         featured_tracks=featured,
     )
+
+
+@router.get("/{username}/track-ratings", response_model=list[UserTrackRatingPublic])
+async def list_user_track_ratings(
+    username: str,
+    album_id: str | None = Query(default=None, description="Limit to one album (album UUID)"),
+    limit: int = Query(default=50, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    """Public list of a user’s per-track ratings; optional filter by album."""
+    result = await db.execute(select(User).where(User.username == username))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    stmt = (
+        select(TrackRating, Track, Album)
+        .join(Track, Track.id == TrackRating.track_id)
+        .join(Album, Album.id == Track.album_id)
+        .where(TrackRating.user_id == user.id)
+    )
+    if album_id:
+        try:
+            aid = uuid.UUID(album_id)
+        except ValueError as e:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid album_id") from e
+        stmt = stmt.where(Album.id == aid)
+        stmt = stmt.order_by(Track.disc_number, Track.track_number, Track.title)
+    else:
+        stmt = stmt.order_by(TrackRating.updated_at.desc())
+
+    rows = (await db.execute(stmt.limit(limit))).all()
+    return [
+        UserTrackRatingPublic(
+            track_id=str(track.id),
+            spotify_track_id=track.spotify_track_id,
+            title=track.title,
+            disc_number=track.disc_number,
+            track_number=track.track_number,
+            rating=tr.rating,
+            album_id=str(album.id),
+            album_title=album.title,
+            album_artist=album.artist,
+        )
+        for tr, track, album in rows
+    ]
 
 
 @router.get("/{username}", response_model=UserProfile)

@@ -34,4 +34,8 @@ class ReviewResponse(BaseModel):
     album_artist: str = ""
     album_cover_url: str | None = None
 
+    # Same reviewer’s per-track ratings on this album (if any).
+    album_track_rating_count: int = 0
+    album_track_rating_average: float | None = None
+
     model_config = {"from_attributes": True}

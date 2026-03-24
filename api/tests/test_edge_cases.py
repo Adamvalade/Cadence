@@ -2,6 +2,8 @@ import uuid
 
 import pytest
 
+from app.core.config import assert_safe_for_production
+
 
 @pytest.mark.asyncio
 async def test_malformed_uuid_album(client):
@@ -106,4 +108,58 @@ async def test_delete_others_review(client):
 async def test_health_endpoint(client):
     r = await client.get("/health")
     assert r.status_code == 200
-    assert r.json()["ok"] is True
+    data = r.json()
+    assert data["ok"] is True
+    assert data["database"] == "connected"
+    assert data["redis"] in ("connected", "unavailable")
+    assert r.headers.get("X-Request-ID")
+
+
+@pytest.mark.asyncio
+async def test_root_lists_docs_in_development(client):
+    r = await client.get("/")
+    assert r.status_code == 200
+    assert "docs" in r.json()
+
+
+def test_production_guard_ignores_non_production():
+    assert_safe_for_production(
+        environment="development",
+        secret_key="x",
+        frontend_url="http://evil.com",
+    )
+
+
+def test_production_guard_rejects_weak_secret():
+    with pytest.raises(RuntimeError, match="SECRET_KEY"):
+        assert_safe_for_production(
+            environment="production",
+            secret_key="change-me",
+            frontend_url="https://example.com",
+        )
+
+
+def test_production_guard_rejects_short_secret():
+    with pytest.raises(RuntimeError, match="SECRET_KEY"):
+        assert_safe_for_production(
+            environment="production",
+            secret_key="a" * 31,
+            frontend_url="https://example.com",
+        )
+
+
+def test_production_guard_rejects_http_public_origin():
+    with pytest.raises(RuntimeError, match="https"):
+        assert_safe_for_production(
+            environment="production",
+            secret_key="a" * 32,
+            frontend_url="http://example.com",
+        )
+
+
+def test_production_guard_allows_localhost_http():
+    assert_safe_for_production(
+        environment="production",
+        secret_key="a" * 32,
+        frontend_url="http://localhost:3000",
+    )

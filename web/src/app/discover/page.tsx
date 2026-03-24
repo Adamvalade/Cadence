@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import ReviewCard from "@/components/ReviewCard";
 import { api } from "@/lib/api";
+import { formatAverageRatingLabel } from "@/lib/ratingDisplay";
 import { useTitle } from "@/lib/useTitle";
 import type { Album, Review } from "@/lib/types";
 
@@ -38,7 +39,9 @@ function AlbumGrid({ albums }: { albums: Album[] }) {
             <p className="text-sm font-medium truncate">{album.title}</p>
             <p className="text-xs text-muted-foreground truncate">{album.artist}</p>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              {album.avg_rating != null && <span>{album.avg_rating}/10</span>}
+              {album.avg_rating != null && (
+                <span>{formatAverageRatingLabel(album.avg_rating)}</span>
+              )}
               {album.avg_rating != null && <span>&middot;</span>}
               <span>{album.review_count} {album.review_count === 1 ? "review" : "reviews"}</span>
             </div>

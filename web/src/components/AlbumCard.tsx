@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Music } from "lucide-react";
+import { formatAverageRatingLabel } from "@/lib/ratingDisplay";
 
 interface AlbumCardProps {
   id: string;
@@ -38,7 +39,9 @@ export default function AlbumCard({ id, title, artist, coverUrl, rating, reviewC
           <p className="text-xs text-muted-foreground line-clamp-1">{artist}</p>
           {(rating != null || reviewCount != null) && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              {rating != null && <span className="font-medium">{rating.toFixed(1)}/10</span>}
+              {rating != null && (
+                <span className="font-medium">{formatAverageRatingLabel(rating)}</span>
+              )}
               {reviewCount != null && reviewCount > 0 && (
                 <span>{reviewCount} {reviewCount === 1 ? "review" : "reviews"}</span>
               )}

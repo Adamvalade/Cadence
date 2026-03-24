@@ -20,6 +20,19 @@ export interface UserRatingStats {
   combined_rating_distribution: Record<string, number>;
 }
 
+/** GET /users/:username/track-ratings */
+export interface UserTrackRatingEntry {
+  track_id: string;
+  spotify_track_id: string;
+  title: string;
+  disc_number: number;
+  track_number: number;
+  rating: number;
+  album_id: string;
+  album_title: string;
+  album_artist: string;
+}
+
 export interface FeaturedTrackPublic {
   slot: number;
   spotify_track_id: string;
@@ -115,6 +128,9 @@ export interface Review {
   album_title: string;
   album_artist: string;
   album_cover_url: string | null;
+  /** Reviewer’s per-track ratings on this album (from API). */
+  album_track_rating_count?: number;
+  album_track_rating_average?: number | null;
 }
 
 export interface FeedResponse {

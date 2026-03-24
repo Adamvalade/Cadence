@@ -13,10 +13,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ReviewCard from "@/components/ReviewCard";
 import FeaturedTracksEditor from "@/components/FeaturedTracksEditor";
 import RatingDistribution from "@/components/RatingDistribution";
+import UserRatedTracksSection from "@/components/UserRatedTracksSection";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { Review, UserList, UserProfile } from "@/lib/types";
 import { useTitle } from "@/lib/useTitle";
+import { formatAverageRatingLabel } from "@/lib/ratingDisplay";
 
 function ProfileSkeleton() {
   return (
@@ -124,8 +126,8 @@ export default function ProfilePage() {
   const isOwnProfile = currentUser?.username === profile.username;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
-      <div className="flex items-start gap-6">
+    <div className="max-w-3xl mx-auto px-3 py-5 sm:px-4 sm:py-6">
+      <div className="flex items-start gap-4 sm:gap-5">
         <Avatar className="h-20 w-20">
           <AvatarImage src={profile.avatar_url || undefined} alt={profile.username} />
           <AvatarFallback className="text-2xl">{profile.username[0].toUpperCase()}</AvatarFallback>
@@ -167,24 +169,28 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="rounded-lg border border-border bg-card p-4">
+      <div className="mt-5 grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
+        <div className="rounded-lg border border-border bg-card p-3">
           <p className="text-xs text-muted-foreground uppercase tracking-wide">Album ratings</p>
           <p className="text-2xl font-semibold tabular-nums mt-1">{profile.rating_stats.album_ratings_count}</p>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Avg {profile.rating_stats.album_ratings_average ?? "—"}
-            {profile.rating_stats.album_ratings_average != null ? "/10" : ""}
+            Avg{" "}
+            {profile.rating_stats.album_ratings_average != null
+              ? formatAverageRatingLabel(profile.rating_stats.album_ratings_average)
+              : "—"}
           </p>
         </div>
-        <div className="rounded-lg border border-border bg-card p-4">
+        <div className="rounded-lg border border-border bg-card p-3">
           <p className="text-xs text-muted-foreground uppercase tracking-wide">Song ratings</p>
           <p className="text-2xl font-semibold tabular-nums mt-1">{profile.rating_stats.song_ratings_count}</p>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Avg {profile.rating_stats.song_ratings_average ?? "—"}
-            {profile.rating_stats.song_ratings_average != null ? "/10" : ""}
+            Avg{" "}
+            {profile.rating_stats.song_ratings_average != null
+              ? formatAverageRatingLabel(profile.rating_stats.song_ratings_average)
+              : "—"}
           </p>
         </div>
-        <div className="rounded-lg border border-border bg-card p-4 col-span-2 md:col-span-2">
+        <div className="rounded-lg border border-border bg-card p-3 col-span-2 md:col-span-2">
           <p className="text-xs text-muted-foreground uppercase tracking-wide">All ratings</p>
           <p className="text-2xl font-semibold tabular-nums mt-1">
             {profile.rating_stats.album_ratings_count + profile.rating_stats.song_ratings_count}
@@ -194,13 +200,13 @@ export default function ProfilePage() {
       </div>
 
       {profile.rating_stats.album_ratings_count + profile.rating_stats.song_ratings_count > 0 && (
-        <div className="mt-6 rounded-lg border border-border bg-card p-4">
+        <div className="mt-5 rounded-lg border border-border bg-card p-3 sm:p-4">
           <RatingDistribution distribution={profile.rating_stats.combined_rating_distribution} />
         </div>
       )}
 
-      <div className="mt-8">
-        <h2 className="text-lg font-semibold mb-3">Featured songs</h2>
+      <div className="mt-6">
+        <h2 className="text-base font-semibold mb-2">Featured songs</h2>
         {profile.featured_tracks.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {isOwnProfile
@@ -239,7 +245,7 @@ export default function ProfilePage() {
         )}
       </div>
 
-      <Separator className="my-8" />
+      <Separator className="my-6" />
 
       <Tabs defaultValue="reviews">
         <TabsList>
@@ -247,9 +253,9 @@ export default function ProfilePage() {
           <TabsTrigger value="lists">Lists ({lists.length})</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="reviews" className="mt-4 space-y-4">
+        <TabsContent value="reviews" className="mt-3 space-y-3">
           {reviews.length === 0 ? (
-            <div className="text-center py-12 space-y-2">
+            <div className="text-center py-8 space-y-2">
               <p className="text-muted-foreground">No reviews yet.</p>
               {isOwnProfile && (
                 <Button variant="outline" size="sm" render={<Link href="/search" />}>
@@ -264,9 +270,9 @@ export default function ProfilePage() {
           )}
         </TabsContent>
 
-        <TabsContent value="lists" className="mt-4 space-y-3">
+        <TabsContent value="lists" className="mt-3 space-y-2">
           {lists.length === 0 ? (
-            <div className="text-center py-12 space-y-2">
+            <div className="text-center py-8 space-y-2">
               <p className="text-muted-foreground">No lists yet.</p>
               {isOwnProfile && (
                 <p className="text-sm text-muted-foreground">
@@ -277,7 +283,7 @@ export default function ProfilePage() {
           ) : (
             lists.map((list) => (
               <Link key={list.id} href={`/lists/${list.id}`} className="block">
-                <div className="border rounded-lg p-4 hover:bg-accent/50 transition-colors">
+                <div className="border rounded-lg p-3 hover:bg-accent/50 transition-colors">
                   <h3 className="font-medium">{list.title}</h3>
                   {list.description && (
                     <p className="text-sm text-muted-foreground mt-1">{list.description}</p>
@@ -288,6 +294,10 @@ export default function ProfilePage() {
           )}
         </TabsContent>
       </Tabs>
+
+      {profile.rating_stats.song_ratings_count > 0 && (
+        <UserRatedTracksSection username={profile.username} isOwnProfile={isOwnProfile} />
+      )}
     </div>
   );
 }
