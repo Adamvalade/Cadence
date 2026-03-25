@@ -21,6 +21,8 @@ class Settings(BaseSettings):
 
     SPOTIFY_CLIENT_ID: str = ""
     SPOTIFY_CLIENT_SECRET: str = ""
+    # Loaded for env/Compose parity with Spotify dashboard; album search uses client credentials only.
+    SPOTIFY_REDIRECT_URI: str = ""
     # ISO 3166-1 alpha-2; client-credentials search/catalog calls need a market
     SPOTIFY_MARKET: str = "US"
 
@@ -44,6 +46,22 @@ class Settings(BaseSettings):
     # Optional error reporting (initialized in api/main.py before create_app).
     SENTRY_DSN: str = ""
     SENTRY_TRACES_SAMPLE_RATE: float = 0.0
+
+    # Demo account: POST /auth/demo-login (404 when disabled). Use a dedicated email; min 8-char password.
+    DEMO_LOGIN_ENABLED: bool = False
+    DEMO_USER_EMAIL: str = "demo@cadence.local"
+    DEMO_USER_PASSWORD: str = ""
+    DEMO_LOGIN_AUTO_CREATE: bool = True
+    # When demo login is configured, seed fake friends + reviews at API startup (idempotent).
+    DEMO_SEED_AT_STARTUP: bool = True
+
+    @property
+    def demo_login_available(self) -> bool:
+        return self.DEMO_LOGIN_ENABLED and len(self.DEMO_USER_PASSWORD.strip()) >= 8
+
+    @property
+    def demo_seed_at_startup_enabled(self) -> bool:
+        return self.demo_login_available and self.DEMO_SEED_AT_STARTUP
 
     @property
     def is_production(self) -> bool:

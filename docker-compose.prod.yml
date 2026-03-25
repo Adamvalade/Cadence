@@ -1,5 +1,9 @@
 # Optional merge files (from repo root): deploy/docker-compose.caddy.yml, deploy/docker-compose.secrets.yml,
 # deploy/docker-compose.backup.yml — see deploy/README.md
+#
+# Environment variables: put them in a file named `.env` in THIS directory (repo root),
+# next to this compose file. Run:  cp .env.example .env  then edit `.env`.
+# Docker Compose loads root `.env` automatically for ${VAR} substitution — not api/.env.
 
 services:
   db:
@@ -36,6 +40,7 @@ services:
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY - min 32 chars for production}
       SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
       SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
+      SPOTIFY_REDIRECT_URI: ${SPOTIFY_REDIRECT_URI:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
@@ -46,6 +51,11 @@ services:
       TRUSTED_HOSTS: ${TRUSTED_HOSTS:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
       SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0}
+      DEMO_LOGIN_ENABLED: ${DEMO_LOGIN_ENABLED:-false}
+      DEMO_USER_EMAIL: ${DEMO_USER_EMAIL:-demo@cadence.local}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-}
+      DEMO_LOGIN_AUTO_CREATE: ${DEMO_LOGIN_AUTO_CREATE:-true}
+      DEMO_SEED_AT_STARTUP: ${DEMO_SEED_AT_STARTUP:-true}
     ports: ["8000:8000"]
     healthcheck:
       test:
@@ -63,10 +73,12 @@ services:
       context: ./web
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+        NEXT_PUBLIC_DEMO_LOGIN: ${NEXT_PUBLIC_DEMO_LOGIN:-false}
     environment:
       # Internal URL for /api/upstream proxy (browser cannot call docker service names).
       API_URL: http://api:8000
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      NEXT_PUBLIC_DEMO_LOGIN: ${NEXT_PUBLIC_DEMO_LOGIN:-false}
     depends_on:
       api:
         condition: service_healthy

@@ -2,6 +2,8 @@
 
 Compose files here **merge** with `docker-compose.prod.yml` from the repo root. Always run commands from the **repository root**.
 
+**Env vars for compose:** put them in **`.env` in the repo root** (copy from **`.env.example`** there). Compose reads that file automatically; **`api/.env` is not used** by `docker-compose.prod.yml`.
+
 ## HTTPS at the edge (Caddy + Let’s Encrypt)
 
 1. Create DNS **A** (or **AAAA**) records for your app and API hosts pointing at the server’s public IP.

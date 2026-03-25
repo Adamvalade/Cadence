@@ -1,81 +1,68 @@
-Cadence is a social app for logging albums, rating/reviewing music, and discovering new releases through people you follow.
+# Cadence
 
+Cadence is a small full-stack app for logging albums you’ve listened to, writing short reviews, and seeing what people you follow are into. There’s search (with Spotify as a catalog source), a home feed from followed users, and pages for profiles, albums, and lists.
 
-Cadence/
-  api/
-    app/
-      main.py
-      core/        # settings, security, logging
-      db/          # engine/session, base
-      models/      # SQLAlchemy models
-      schemas/     # Pydantic DTOs
-      routers/     # FastAPI routers
-      services/    # spotify client, feed builder, etc.
-      tasks/       # background jobs (optional)
-    tests/
-    alembic/
-    requirements.txt (or pyproject.toml)
-  web/
-    src/
-      pages/ or app/   # if Next
-      components/
-      lib/             # api client, auth helpers
-      styles/
-  bin/
-    setup.sh
-  docker-compose.yml
-  README.md
-  SPEC.md
+If you’re reviewing this repo: clone it, skim `web/src/app` and `api/app/routers`, or hit a deployed instance and use **Try demo** on the login screen when that’s enabled—you’ll land in a pre-seeded account with fake friends and reviews so the UI isn’t empty.
 
-## Running locally
+---
 
-**First time:** `./bin/setup.sh` — installs Python deps, runs migrations, creates `web/.env.local`, `npm install`.
+## Stack
 
-**Every time you want the site in the browser:** `./bin/dev.sh` — starts Docker (Postgres + Redis), API on **http://localhost:8000**, Next.js on **http://localhost:3000**.
+- **Backend:** Python, FastAPI, SQLAlchemy + Alembic, Postgres, Redis  
+- **Frontend:** Next.js (App Router), TypeScript  
+- **Deploy:** Docker Compose; optional Caddy + Let’s Encrypt under `deploy/`
 
-Or one shot: `./bin/setup.sh --dev` (setup + then same as `dev.sh`).
+Rough layout:
 
-Copy `api/.env.example` → `api/.env` and set `DATABASE_URL`, `SECRET_KEY`, optional Spotify keys, and `FRONTEND_URL=http://localhost:3000`. Postgres in Docker is on host port **5433** by default (`DATABASE_URL` in `.env.example` matches).
+```
+api/app/     routers, models, services (feed, Spotify client, etc.)
+web/src/     app routes, components, API client
+```
 
-## Production
+---
 
-**Stack:** `docker compose -f docker-compose.prod.yml up --build` runs Postgres, Redis, API, and Next. The API image **runs `alembic upgrade head` on startup** before serving traffic. With **multiple API replicas**, run migrations from a single job or one instance only—parallel upgrades can race.
+## Run it locally
 
-**Required environment (see `api/.env.example`):**
+1. `./bin/setup.sh` — Python venv, migrations, `web/.env.local`, `npm install`  
+2. Copy `api/.env.example` → `api/.env` and fix `DATABASE_URL` / `SECRET_KEY` / `FRONTEND_URL` (Postgres from `docker-compose.yml` is on port **5433** by default).  
+3. `./bin/dev.sh` — Postgres + Redis in Docker, API at **http://localhost:8000**, Next at **http://localhost:3000**
 
-- Set `ENVIRONMENT=production` on the API (already set in `docker-compose.prod.yml`).
-- **`SECRET_KEY`:** at least 32 characters, not a known placeholder (the API refuses to start otherwise).
-- **`FRONTEND_URL`:** public browser origin with **`https://`** (except `http://localhost` / `http://127.0.0.1` for local compose smoke tests). Must match CORS and OAuth redirect configuration exactly.
-- **`NEXT_PUBLIC_API_URL`:** the **public** API base URL your browser will call (usually `https://…`, baked in at Next build time).
-- If you use Google sign-in, redirect URIs must match your production API callback URLs. Password reset email uses optional **Resend** (`RESEND_API_KEY`, `EMAIL_FROM` in `api/.env.example`).
+---
 
-**Hardening already in place:** OpenAPI `/docs` is disabled in production; `X-Request-ID` on responses; optional **`TRUSTED_HOSTS`** (comma-separated) enables `TrustedHostMiddleware`; `/health` checks Postgres and reports Redis; Next adds baseline security headers (frame deny, nosniff, referrer policy, permissions policy). [Dependabot](.github/dependabot.yml) is configured for `api`, `web`, and GitHub Actions.
+## Production (Compose)
 
-**Implemented in-repo (see [`deploy/README.md`](deploy/README.md) for commands and caveats):**
+From the **repo root** (where `docker-compose.prod.yml` lives):
 
-| Topic | What to use |
-| ----- | ----------- |
-| **HTTPS at the edge** | [`deploy/docker-compose.caddy.yml`](deploy/docker-compose.caddy.yml) + [`deploy/caddy/Caddyfile`](deploy/caddy/Caddyfile) (Caddy + Let’s Encrypt). Hosted deploys can use the platform’s TLS instead. |
-| **Managed secrets** | [`deploy/docker-compose.secrets.yml`](deploy/docker-compose.secrets.yml) + files under `./secrets/`; API entrypoint supports `SECRET_KEY_FILE`, `POSTGRES_PASSWORD_FILE`, and `DATABASE_URL_FILE`. |
-| **Postgres backups** | [`deploy/docker-compose.backup.yml`](deploy/docker-compose.backup.yml) (daily `pg_dump` to `./data/pg-backups`). Prefer provider snapshots + off-site copies for real DR. |
-| **Sentry** | Optional `SENTRY_DSN` / `SENTRY_TRACES_SAMPLE_RATE` on the API (initialized in `api/main.py`). Next.js Sentry is documented in `deploy/README.md` only. |
+```bash
+cp .env.example .env   # if you don’t have one yet
+docker compose -f docker-compose.prod.yml up --build -d
+```
 
-**Still your responsibility:** firewall rules (e.g. do not expose `3000`/`8000` publicly when Caddy is fronting), cloud **managed DB backups** if you move off the compose Postgres volume, legal/privacy pages for a public product, and tuning alert rules in Sentry or your host.
+Compose reads **`.env` in that root folder**—not `api/.env`. (`api/.env` is for local `uvicorn` only.)
 
-### Alembic: `relation "albums" already exists` (or other “already exists”)
+You need things like `POSTGRES_PASSWORD`, `SECRET_KEY`, `FRONTEND_URL`, and `NEXT_PUBLIC_API_URL` (public URLs your browser actually uses). More detail: [deploy/README.md](deploy/README.md).
 
-The database **already has tables** but **`alembic_version` is empty or behind**, so `alembic upgrade head` tries to create objects that are already there. That also breaks the API if the code expects columns your DB does not have yet (e.g. search touching `albums`).
+### Demo mode (optional)
 
-**Prefer:** run `./bin/setup.sh` again — it stamps the revision Alembic was trying to apply, then retries `upgrade head` in a loop.
+Add to your **root** `.env`:
 
-**Manual recovery:** stamp the **target** revision from the error line `Running upgrade … -> REV`, then upgrade again. Example if the first failure is on the initial migration:
+```env
+DEMO_LOGIN_ENABLED=true
+DEMO_USER_PASSWORD=some-password-at-least-8-characters
+```
 
-`cd api && source .venv/bin/activate && alembic stamp 225104d8ff02 && alembic upgrade head`
+(You can keep `DEMO_USER_EMAIL`, `DEMO_LOGIN_AUTO_CREATE`, and `DEMO_SEED_AT_STARTUP` as in `.env.example`; defaults are fine.)
 
-If the next error is `listen_statuses` already exists:
+**What `DEMO_USER_PASSWORD` is:** It’s the password for the **single shared demo user** on your server. You choose it and put it only in `.env`. Recruiters **do not** type it—the **Try demo** button calls the API, which logs them into that account using the value from the server config. So it’s not “their” password; it’s the demo account’s password, and you should assume anyone with access to your env or repo secrets could see it. Don’t reuse a real personal password. After changing it, if the demo user already existed with an old hash, you’d need to fix or delete that user in the DB once—first-time deploys usually don’t hit that.
 
-`alembic stamp ab35e8d933c3 && alembic upgrade head`
+---
 
-Repeat until `alembic upgrade head` succeeds. Avoid `alembic stamp head` unless you are sure every migration’s DDL is already applied — otherwise you can skip real migrations.
+## Ops notes
 
-`alembic current` should end on the same revision as `alembic heads`.
+- API runs `alembic upgrade head` on container start.  
+- Prod turns off OpenAPI docs; `/health` checks DB + Redis.  
+- Dependabot: [.github/dependabot.yml](.github/dependabot.yml)
+
+### Alembic “already exists”
+
+DB has tables but Alembic’s version is wrong. See `./bin/setup.sh` stamping logic, or stamp the revision named in the error then `alembic upgrade head` again—don’t `stamp head` unless you’re sure every migration already ran.

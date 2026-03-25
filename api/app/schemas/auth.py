@@ -26,6 +26,10 @@ class MessageResponse(BaseModel):
     message: str
 
 
+class DemoStatusResponse(BaseModel):
+    enabled: bool
+
+
 class AuthResponse(BaseModel):
     message: str
     user: "UserBrief"

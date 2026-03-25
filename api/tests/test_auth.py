@@ -121,6 +121,19 @@ async def test_forgot_and_reset_password(client, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_demo_login_disabled(client):
+    r = await client.post("/auth/demo-login")
+    assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_demo_status(client):
+    r = await client.get("/auth/demo-status")
+    assert r.status_code == 200
+    assert r.json() == {"enabled": False}
+
+
+@pytest.mark.asyncio
 async def test_logout(client):
     reg = await client.post("/auth/register", json={
         "email": "logout@cadence.app",

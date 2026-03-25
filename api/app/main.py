@@ -11,12 +11,22 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.core.config import settings, validate_production_settings
 from app.core.http_middleware import RequestIdMiddleware
+from app.db.session import async_session
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if settings.demo_seed_at_startup_enabled:
+        try:
+            from app.services.demo_seed import seed_demo_public_dataset
+
+            async with async_session() as session:
+                await seed_demo_public_dataset(session)
+                await session.commit()
+        except Exception:
+            logger.exception("Demo dataset seed at startup failed")
     yield
 
 

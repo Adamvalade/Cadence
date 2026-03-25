@@ -9,6 +9,7 @@ interface AuthContextType {
   user: UserBrief | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  demoLogin: () => Promise<void>;
   register: (email: string, username: string, password: string, displayName?: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: (opts?: { clearOnAuthError?: boolean }) => Promise<void>;
@@ -51,6 +52,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await refresh({ clearOnAuthError: false });
   };
 
+  const demoLogin = async () => {
+    const res = await api.post<AuthResponse>("/auth/demo-login", {});
+    persistAccessToken(res.access_token);
+    setUser(res.user);
+    await refresh({ clearOnAuthError: false });
+  };
+
   const register = async (email: string, username: string, password: string, displayName?: string) => {
     const res = await api.post<AuthResponse>("/auth/register", {
       email,
@@ -70,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refresh }}>
+    <AuthContext.Provider value={{ user, loading, login, demoLogin, register, logout, refresh }}>
       {children}
     </AuthContext.Provider>
   );

@@ -19,6 +19,7 @@ from app.models.password_reset_token import PasswordResetToken
 from app.models.user import User
 from app.schemas.auth import (
     AuthResponse,
+    DemoStatusResponse,
     ForgotPasswordRequest,
     LoginRequest,
     MessageResponse,
@@ -26,6 +27,7 @@ from app.schemas.auth import (
     ResetPasswordRequest,
     UserBrief,
 )
+from app.services.demo_seed import personalize_demo_account
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -121,6 +123,11 @@ def _user_brief(user: User) -> UserBrief:
 # ── Email/Password ──────────────────────────────────────────────────
 
 
+@router.get("/demo-status", response_model=DemoStatusResponse)
+async def demo_status():
+    return DemoStatusResponse(enabled=settings.demo_login_available)
+
+
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 async def register(request: Request, body: RegisterRequest, response: Response, db: AsyncSession = Depends(get_db)):
     auth_limiter.check(request)
@@ -155,6 +162,50 @@ async def login(request: Request, body: LoginRequest, response: Response, db: As
 
     token = _issue_session(response, str(user.id))
     return AuthResponse(message="Login successful", user=_user_brief(user), access_token=token)
+
+
+@router.post("/demo-login", response_model=AuthResponse)
+async def demo_login(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
+    if not settings.demo_login_available:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    auth_limiter.check(request)
+
+    email = settings.DEMO_USER_EMAIL.strip()
+    password = settings.DEMO_USER_PASSWORD.strip()
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        if not settings.DEMO_LOGIN_AUTO_CREATE:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Demo account is not provisioned",
+            )
+        username = "demo"
+        taken = await db.execute(select(User).where(User.username == username))
+        if taken.scalar_one_or_none():
+            username = f"demo_{secrets.token_hex(3)}"
+        user = User(
+            email=email,
+            username=username,
+            password_hash=hash_password(password),
+            display_name="Jamie Demo",
+        )
+        db.add(user)
+        await db.flush()
+        await db.refresh(user)
+    elif not user.password_hash or not verify_password(password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Demo login misconfigured or password changed for this account",
+        )
+
+    await personalize_demo_account(db, user)
+    await db.commit()
+    await db.refresh(user)
+
+    token = _issue_session(response, str(user.id))
+    return AuthResponse(message="Demo login successful", user=_user_brief(user), access_token=token)
 
 
 @router.post("/logout")
