@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Trusted TLS for the API on :8000 (Spotify OAuth). Requires mkcert:
-# https://github.com/FiloSottile/mkcert
+# Trusted TLS for the API on :8000 (e.g. when the web app uses NEXT_PUBLIC_API_URL=https://…).
+# Requires mkcert: https://github.com/FiloSottile/mkcert
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -25,12 +25,6 @@ echo "Wrote:"
 echo "  $CERT_FILE"
 echo "  $KEY_FILE"
 echo ""
-echo "Set in api/.env:"
-echo "  SPOTIFY_REDIRECT_URI=https://127.0.0.1:8000/auth/spotify/callback"
-echo "and in web/.env.local:"
+echo "Set in web/.env.local:"
 echo "  NEXT_PUBLIC_API_URL=https://127.0.0.1:8000"
-echo ""
-echo "In Spotify Dashboard → Redirect URIs, add exactly:"
-echo "  https://127.0.0.1:8000/auth/spotify/callback"
-echo "(Safari and Spotify's rules treat https://localhost as insecure; 127.0.0.1 is the loopback exception.)"
 echo "Then restart ./bin/dev.sh — TLS is used when these cert files exist."

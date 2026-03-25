@@ -47,7 +47,7 @@ Copy `api/.env.example` → `api/.env` and set `DATABASE_URL`, `SECRET_KEY`, opt
 - **`SECRET_KEY`:** at least 32 characters, not a known placeholder (the API refuses to start otherwise).
 - **`FRONTEND_URL`:** public browser origin with **`https://`** (except `http://localhost` / `http://127.0.0.1` for local compose smoke tests). Must match CORS and OAuth redirect configuration exactly.
 - **`NEXT_PUBLIC_API_URL`:** the **public** API base URL your browser will call (usually `https://…`, baked in at Next build time).
-- Spotify / Google redirect URIs must include your production API callback URLs.
+- If you use Google sign-in, redirect URIs must match your production API callback URLs. Password reset email uses optional **Resend** (`RESEND_API_KEY`, `EMAIL_FROM` in `api/.env.example`).
 
 **Hardening already in place:** OpenAPI `/docs` is disabled in production; `X-Request-ID` on responses; optional **`TRUSTED_HOSTS`** (comma-separated) enables `TrustedHostMiddleware`; `/health` checks Postgres and reports Redis; Next adds baseline security headers (frame deny, nosniff, referrer policy, permissions policy). [Dependabot](.github/dependabot.yml) is configured for `api`, `web`, and GitHub Actions.
 

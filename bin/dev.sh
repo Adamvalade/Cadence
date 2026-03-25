@@ -42,7 +42,7 @@ SSL_KEY="$API_DIR/certs/localhost-key.pem"
 UVICORN_SSL=()
 if [[ -f "$SSL_CERT" && -f "$SSL_KEY" ]]; then
   UVICORN_SSL=(--ssl-keyfile "$SSL_KEY" --ssl-certfile "$SSL_CERT")
-  API_URL_MSG="https://127.0.0.1:8000  (TLS: api/certs/; use this host for Spotify/Safari)"
+  API_URL_MSG="https://127.0.0.1:8000  (TLS: api/certs/)"
 else
   API_URL_MSG="http://localhost:8000"
 fi
@@ -58,22 +58,9 @@ if [[ -f "$WEB_DIR/.env.local" ]] && grep -qE '^[[:space:]]*NEXT_PUBLIC_API_URL=
     exit 1
   fi
 fi
-if [[ -f "$API_DIR/.env" ]] && grep -qE '^[[:space:]]*SPOTIFY_REDIRECT_URI=https://' "$API_DIR/.env" 2>/dev/null; then
-  if [[ ! -f "$SSL_CERT" || ! -f "$SSL_KEY" ]]; then
-    echo ""
-    echo "ERROR: api/.env sets SPOTIFY_REDIRECT_URI=https://… but TLS certs are missing."
-    echo "Run:  ./bin/ssl-localhost.sh"
-    exit 1
-  fi
-fi
-
 echo ""
 echo "API  → $API_URL_MSG  (docs: /docs)"
 echo "App  → http://localhost:3000"
-if [[ ${#UVICORN_SSL[@]} -eq 0 ]]; then
-  echo ""
-  echo "Spotify OAuth: if your app only allows https redirect URIs, run:  ./bin/ssl-localhost.sh"
-fi
 echo "Press Ctrl+C to stop API + web."
 echo ""
 

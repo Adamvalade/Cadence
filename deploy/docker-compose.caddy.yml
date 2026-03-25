@@ -3,7 +3,6 @@
 #   export WEB_HOST=app.example.com API_HOST=api.example.com CADDY_EMAIL=you@example.com
 #   export FRONTEND_URL=https://app.example.com
 #   export NEXT_PUBLIC_API_URL=https://api.example.com
-#   export SPOTIFY_REDIRECT_URI=https://api.example.com/auth/spotify/callback
 #   docker compose -f docker-compose.prod.yml -f deploy/docker-compose.caddy.yml up --build
 #
 # Point DNS A/AAAA for WEB_HOST and API_HOST at this machine. Open ports 80 and 443.

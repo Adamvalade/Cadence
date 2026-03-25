@@ -21,11 +21,12 @@ class Settings(BaseSettings):
 
     SPOTIFY_CLIENT_ID: str = ""
     SPOTIFY_CLIENT_SECRET: str = ""
-    # Must match Spotify app Redirect URIs exactly. Spotify treats https://localhost as "insecure" in
-    # Safari and newer rules — use https://127.0.0.1:8000/... (see bin/ssl-localhost.sh).
-    SPOTIFY_REDIRECT_URI: str = "https://127.0.0.1:8000/auth/spotify/callback"
     # ISO 3166-1 alpha-2; client-credentials search/catalog calls need a market
     SPOTIFY_MARKET: str = "US"
+
+    # Password reset emails via https://resend.com (optional; without these, link is only logged in dev)
+    RESEND_API_KEY: str = ""
+    EMAIL_FROM: str = ""
 
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""

@@ -12,7 +12,7 @@ Compose files here **merge** with `docker-compose.prod.yml` from the repo root. 
    export WEB_HOST=app.example.com API_HOST=api.example.com CADDY_EMAIL=you@example.com
    export FRONTEND_URL=https://app.example.com
    export NEXT_PUBLIC_API_URL=https://api.example.com
-   export SPOTIFY_REDIRECT_URI=https://api.example.com/auth/spotify/callback
+   # Optional: Resend (password reset) — see api/.env.example
    # Google OAuth callback URLs must match your API host as well.
    export TRUSTED_HOSTS=api.example.com
    ```

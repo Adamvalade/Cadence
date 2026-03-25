@@ -36,7 +36,8 @@ services:
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY - min 32 chars for production}
       SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
       SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
-      SPOTIFY_REDIRECT_URI: ${SPOTIFY_REDIRECT_URI:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
@@ -62,6 +63,9 @@ services:
       context: ./web
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    environment:
+      # Same as build arg: server-side redirects (e.g. /auth/spotify → API) read this at runtime.
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     depends_on:
       api:
         condition: service_healthy

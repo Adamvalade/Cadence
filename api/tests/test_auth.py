@@ -84,6 +84,43 @@ async def test_me_unauthenticated(client):
 
 
 @pytest.mark.asyncio
+async def test_forgot_password_unknown_email(client):
+    r = await client.post("/auth/forgot-password", json={"email": "nobody@cadence.app"})
+    assert r.status_code == 200
+    assert "message" in r.json()
+
+
+@pytest.mark.asyncio
+async def test_forgot_and_reset_password(client, monkeypatch):
+    from app.routers import auth as auth_mod
+
+    monkeypatch.setattr(auth_mod.secrets, "token_urlsafe", lambda _n: "fixed-test-reset-token-abcdef")
+
+    await client.post(
+        "/auth/register",
+        json={
+            "email": "resetme@cadence.app",
+            "username": "resetmeuser",
+            "password": "oldpassword123",
+        },
+    )
+    r = await client.post("/auth/forgot-password", json={"email": "resetme@cadence.app"})
+    assert r.status_code == 200
+
+    r2 = await client.post(
+        "/auth/reset-password",
+        json={"token": "fixed-test-reset-token-abcdef", "new_password": "newpassword999"},
+    )
+    assert r2.status_code == 200
+
+    bad = await client.post("/auth/login", json={"email": "resetme@cadence.app", "password": "oldpassword123"})
+    assert bad.status_code == 401
+
+    ok = await client.post("/auth/login", json={"email": "resetme@cadence.app", "password": "newpassword999"})
+    assert ok.status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_logout(client):
     reg = await client.post("/auth/register", json={
         "email": "logout@cadence.app",

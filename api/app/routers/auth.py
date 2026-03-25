@@ -1,20 +1,34 @@
+import hashlib
+import logging
 import secrets
-from urllib.parse import quote, urlparse
+from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 
+import httpx
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.deps import get_current_user, get_db
 from app.core.rate_limit import auth_limiter
 from app.core.security import create_access_token, hash_password, verify_password
+from app.models.password_reset_token import PasswordResetToken
 from app.models.user import User
-from app.schemas.auth import AuthResponse, LoginRequest, RegisterRequest, UserBrief
+from app.schemas.auth import (
+    AuthResponse,
+    ForgotPasswordRequest,
+    LoginRequest,
+    MessageResponse,
+    RegisterRequest,
+    ResetPasswordRequest,
+    UserBrief,
+)
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 oauth = OAuth()
 
@@ -32,30 +46,6 @@ def _client_facing_base_url(request: Request) -> str:
     return str(request.base_url).rstrip("/")
 
 
-def _spotify_redirect_uri(request: Request) -> str:
-    """Must exactly match a URI registered on the Spotify app."""
-    explicit = (settings.SPOTIFY_REDIRECT_URI or "").strip()
-    if explicit:
-        return explicit
-    base = _client_facing_base_url(request)
-    return f"{base}/auth/spotify/callback"
-
-
-def _spotify_oauth_origin(redirect_uri: str) -> str:
-    p = urlparse(redirect_uri)
-    return f"{p.scheme}://{p.netloc}"
-
-if settings.SPOTIFY_CLIENT_ID:
-    oauth.register(
-        name="spotify",
-        client_id=settings.SPOTIFY_CLIENT_ID,
-        client_secret=settings.SPOTIFY_CLIENT_SECRET,
-        authorize_url="https://accounts.spotify.com/authorize",
-        access_token_url="https://accounts.spotify.com/api/token",
-        api_base_url="https://api.spotify.com/v1/",
-        client_kwargs={"scope": "user-read-email user-read-private"},
-    )
-
 if settings.GOOGLE_CLIENT_ID:
     oauth.register(
         name="google",
@@ -64,6 +54,41 @@ if settings.GOOGLE_CLIENT_ID:
         server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
         client_kwargs={"scope": "openid email profile"},
     )
+
+
+def _hash_reset_token(raw: str) -> str:
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+async def _send_password_reset_email(to_email: str, reset_url: str) -> None:
+    if settings.RESEND_API_KEY and settings.EMAIL_FROM:
+        async with httpx.AsyncClient() as client:
+            r = await client.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {settings.RESEND_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "from": settings.EMAIL_FROM,
+                    "to": [to_email],
+                    "subject": "Reset your Cadence password",
+                    "html": (
+                        f'<p><a href="{reset_url}">Reset your password</a></p>'
+                        "<p>If you did not request this, you can ignore this email.</p>"
+                    ),
+                },
+                timeout=30.0,
+            )
+            r.raise_for_status()
+        return
+    if settings.is_production:
+        logger.warning(
+            "Password reset email not sent (set RESEND_API_KEY and EMAIL_FROM). Would send to %s",
+            to_email,
+        )
+    else:
+        logger.info("DEV password reset link for %s: %s", to_email, reset_url)
 
 
 def _attach_access_token_cookie(response: Response, token: str) -> None:
@@ -149,75 +174,58 @@ async def me(current_user: User = Depends(get_current_user)):
     return _user_brief(current_user)
 
 
-# ── Spotify OAuth ────────────────────────────────────────────────────
-
-
-@router.get("/spotify")
-async def spotify_login(request: Request):
-    if not settings.SPOTIFY_CLIENT_ID:
-        raise HTTPException(status_code=501, detail="Spotify OAuth not configured")
-    redirect_uri = _spotify_redirect_uri(request)
-    explicit = (settings.SPOTIFY_REDIRECT_URI or "").strip()
-    if explicit:
-        want_origin = _spotify_oauth_origin(redirect_uri).rstrip("/")
-        got_origin = _client_facing_base_url(request)
-        if want_origin != got_origin:
-            return RedirectResponse(url=f"{want_origin}/auth/spotify", status_code=307)
-    return await oauth.spotify.authorize_redirect(request, redirect_uri)
-
-
-@router.get("/spotify/callback")
-async def spotify_callback(request: Request, db: AsyncSession = Depends(get_db)):
-    if not settings.SPOTIFY_CLIENT_ID:
-        raise HTTPException(status_code=501, detail="Spotify OAuth not configured")
-
-    token_data = await oauth.spotify.authorize_access_token(request)
-    resp = await oauth.spotify.get("me", token=token_data)
-    profile = resp.json()
-
-    spotify_id = profile["id"]
-    email = profile.get("email")
-    display_name = profile.get("display_name", "")
-    avatar_url = None
-    images = profile.get("images", [])
-    if images:
-        avatar_url = images[0].get("url")
-
-    result = await db.execute(select(User).where(User.spotify_id == spotify_id))
+@router.post("/forgot-password", response_model=MessageResponse)
+async def forgot_password(request: Request, body: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
+    auth_limiter.check(request)
+    msg = MessageResponse(message="If that email is in our system, you will receive a link shortly.")
+    result = await db.execute(select(User).where(User.email == body.email))
     user = result.scalar_one_or_none()
+    if not user or not user.password_hash:
+        return msg
 
-    if not user and email:
-        result = await db.execute(select(User).where(User.email == email))
-        user = result.scalar_one_or_none()
-        if user:
-            user.spotify_id = spotify_id
-
-    if not user:
-        username = _generate_username(display_name or spotify_id)
-        existing = await db.execute(select(User).where(User.username == username))
-        if existing.scalar_one_or_none():
-            username = f"{username}_{secrets.token_hex(3)}"
-
-        user = User(
-            email=email or f"{spotify_id}@spotify.oauth",
-            username=username,
-            display_name=display_name or username,
-            spotify_id=spotify_id,
-            avatar_url=avatar_url,
-        )
-        db.add(user)
-
-    if avatar_url and not user.avatar_url:
-        user.avatar_url = avatar_url
-
+    await db.execute(delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id))
+    raw_token = secrets.token_urlsafe(32)
+    row = PasswordResetToken(
+        user_id=user.id,
+        token_hash=_hash_reset_token(raw_token),
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    db.add(row)
     await db.commit()
-    await db.refresh(user)
 
-    token = create_access_token(str(user.id))
-    url = f"{settings.FRONTEND_URL.rstrip('/')}/auth/callback#access_token={quote(token, safe='')}"
-    redirect = RedirectResponse(url=url, status_code=307)
-    _attach_access_token_cookie(redirect, token)
-    return redirect
+    reset_url = f"{settings.FRONTEND_URL.rstrip('/')}/auth/reset-password?token={quote(raw_token, safe='')}"
+    try:
+        await _send_password_reset_email(user.email, reset_url)
+    except Exception:
+        logger.exception("Failed to send password reset email")
+    return msg
+
+
+@router.post("/reset-password", response_model=MessageResponse)
+async def reset_password(request: Request, body: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+    auth_limiter.check(request)
+    th = _hash_reset_token(body.token.strip())
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        select(PasswordResetToken).where(
+            PasswordResetToken.token_hash == th,
+            PasswordResetToken.expires_at > now,
+        )
+    )
+    row = result.scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset link")
+
+    user = await db.get(User, row.user_id)
+    if not user:
+        await db.delete(row)
+        await db.commit()
+        raise HTTPException(status_code=400, detail="Invalid or expired reset link")
+
+    user.password_hash = hash_password(body.new_password)
+    await db.delete(row)
+    await db.commit()
+    return MessageResponse(message="Password updated. You can log in.")
 
 
 # ── Google OAuth ─────────────────────────────────────────────────────

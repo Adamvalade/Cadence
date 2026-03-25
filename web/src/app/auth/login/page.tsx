@@ -7,8 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { SpotifyAuthButton } from "@/components/SpotifyAuthButton";
 import { useAuth } from "@/lib/auth";
 import { useTitle } from "@/lib/useTitle";
 
@@ -43,12 +41,6 @@ export default function LoginPage() {
           <CardDescription>Log in to your Cadence account</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <SpotifyAuthButton />
-          <div className="flex items-center gap-3">
-            <Separator className="flex-1" />
-            <span className="text-xs text-muted-foreground">or email</span>
-            <Separator className="flex-1" />
-          </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">
@@ -67,7 +59,15 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="password">Password</Label>
+                <Link
+                  href="/auth/forgot-password"
+                  className="text-xs text-muted-foreground underline hover:text-foreground"
+                >
+                  Forgot password?
+                </Link>
+              </div>
               <Input
                 id="password"
                 type="password"
