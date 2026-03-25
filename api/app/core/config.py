@@ -1,5 +1,6 @@
 from urllib.parse import urlparse
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 # Reject these in production (see validate_production_settings).
@@ -54,6 +55,18 @@ class Settings(BaseSettings):
     DEMO_LOGIN_AUTO_CREATE: bool = True
     # When demo login is configured, seed fake friends + reviews at API startup (idempotent).
     DEMO_SEED_AT_STARTUP: bool = True
+
+    @field_validator("DEMO_LOGIN_ENABLED", mode="before")
+    @classmethod
+    def _coerce_demo_login_enabled(cls, v: object) -> bool:
+        if isinstance(v, bool):
+            return v
+        if v is None or v == "":
+            return False
+        s = str(v).strip().lower()
+        if s in ("0", "false", "no", "off", "n"):
+            return False
+        return s in ("1", "true", "yes", "on")
 
     @property
     def demo_login_available(self) -> bool:

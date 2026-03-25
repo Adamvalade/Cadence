@@ -17,7 +17,12 @@ function resolveApiBase(): string {
     return `${window.location.origin}/api/upstream`;
   }
   try {
-    if (new URL(configured).origin === window.location.origin) {
+    const cfgUrl = new URL(configured);
+    if (cfgUrl.origin === window.location.origin) {
+      return `${window.location.origin}/api/upstream`;
+    }
+    // Production site on HTTPS but image was built with localhost API URL — browser can't reach that.
+    if (window.location.protocol === "https:" && (cfgUrl.hostname === "localhost" || cfgUrl.hostname === "127.0.0.1")) {
       return `${window.location.origin}/api/upstream`;
     }
   } catch {
