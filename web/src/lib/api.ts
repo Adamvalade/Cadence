@@ -1,15 +1,40 @@
 import { readAccessToken } from "./sessionToken";
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+/**
+ * When NEXT_PUBLIC_API_URL matches the site origin (e.g. both https://cadencemusik.com),
+ * calling /auth/register would hit the Next.js page route instead of the API. Use the
+ * server proxy in that case. Otherwise call the API host directly (e.g. api subdomain).
+ */
+function resolveApiBase(): string {
+  if (typeof window === "undefined") {
+    const internal = (process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "").trim();
+    if (internal) return internal.replace(/\/$/, "");
+    return "http://127.0.0.1:8000";
+  }
 
-const API_BASE = API_BASE_URL;
+  const configured = (process.env.NEXT_PUBLIC_API_URL || "").trim().replace(/\/$/, "");
+  if (!configured) {
+    return `${window.location.origin}/api/upstream`;
+  }
+  try {
+    if (new URL(configured).origin === window.location.origin) {
+      return `${window.location.origin}/api/upstream`;
+    }
+  } catch {
+    return configured;
+  }
+  return configured;
+}
+
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 type FetchOptions = RequestInit & { params?: Record<string, string> };
 
 async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T> {
   const { params, headers: customHeaders, ...restInit } = options;
 
-  let url = `${API_BASE}${path}`;
+  const base = resolveApiBase();
+  let url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
   if (params) {
     const searchParams = new URLSearchParams(params);
     url += `?${searchParams.toString()}`;
