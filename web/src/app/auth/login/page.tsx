@@ -44,12 +44,6 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <SpotifyAuthButton />
-          <p className="text-xs text-center text-muted-foreground">
-            Opens your API to sign in with Spotify (works on localhost). If it errors after Spotify, use the same
-            host in <code className="text-[0.7rem]">NEXT_PUBLIC_API_URL</code> as in your Spotify app redirect
-            URIs (add both <code className="text-[0.7rem]">localhost</code> and{" "}
-            <code className="text-[0.7rem]">127.0.0.1</code> in the Spotify dashboard).
-          </p>
           <div className="flex items-center gap-3">
             <Separator className="flex-1" />
             <span className="text-xs text-muted-foreground">or email</span>

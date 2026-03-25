@@ -19,12 +19,25 @@ router = APIRouter()
 oauth = OAuth()
 
 
+def _client_facing_base_url(request: Request) -> str:
+    """Public URL of the API as the browser sees it (TLS termination / reverse proxy safe)."""
+    proto = request.headers.get("x-forwarded-proto", "").split(",")[0].strip().lower()
+    if proto not in ("http", "https"):
+        proto = request.url.scheme
+    host = request.headers.get("x-forwarded-host", "").split(",")[0].strip()
+    if not host:
+        host = request.headers.get("host", "").split(",")[0].strip()
+    if host:
+        return f"{proto}://{host}".rstrip("/")
+    return str(request.base_url).rstrip("/")
+
+
 def _spotify_redirect_uri(request: Request) -> str:
     """Must exactly match a URI registered on the Spotify app."""
     explicit = (settings.SPOTIFY_REDIRECT_URI or "").strip()
     if explicit:
         return explicit
-    base = str(request.base_url).rstrip("/")
+    base = _client_facing_base_url(request)
     return f"{base}/auth/spotify/callback"
 
 
@@ -147,7 +160,7 @@ async def spotify_login(request: Request):
     explicit = (settings.SPOTIFY_REDIRECT_URI or "").strip()
     if explicit:
         want_origin = _spotify_oauth_origin(redirect_uri).rstrip("/")
-        got_origin = str(request.base_url).rstrip("/")
+        got_origin = _client_facing_base_url(request)
         if want_origin != got_origin:
             return RedirectResponse(url=f"{want_origin}/auth/spotify", status_code=307)
     return await oauth.spotify.authorize_redirect(request, redirect_uri)
@@ -214,7 +227,8 @@ async def spotify_callback(request: Request, db: AsyncSession = Depends(get_db))
 async def google_login(request: Request):
     if not settings.GOOGLE_CLIENT_ID:
         raise HTTPException(status_code=501, detail="Google OAuth not configured")
-    redirect_uri = f"{request.base_url}auth/google/callback"
+    base = _client_facing_base_url(request)
+    redirect_uri = f"{base}/auth/google/callback"
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 

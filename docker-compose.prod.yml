@@ -40,7 +40,7 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      ENVIRONMENT: development
+      ENVIRONMENT: ${ENVIRONMENT:-production}
       # Optional: comma-separated API hostnames for TrustedHostMiddleware (e.g. api.example.com)
       TRUSTED_HOSTS: ${TRUSTED_HOSTS:-}
       SENTRY_DSN: ${SENTRY_DSN:-}

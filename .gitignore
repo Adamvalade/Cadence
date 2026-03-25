@@ -16,3 +16,7 @@ secrets/*.txt
 data/pg-backups/
 caddy.env
 deploy/caddy.env
+
+# Optional server-only Docker Compose overrides (not committed):
+#   docker compose -f docker-compose.prod.yml -f docker-compose.prod.override.yml up -d
+docker-compose.prod.override.yml
