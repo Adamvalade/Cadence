@@ -103,8 +103,9 @@ def create_app() -> FastAPI:
     api_routes.include_router(listen_status.router, prefix="/listen-status", tags=["listen-status"])
     api_routes.include_router(discover.router, prefix="/discover", tags=["discover"])
 
-    root = settings.API_ROOT_PATH
-    app.include_router(api_routes, prefix=root)
+    mount = settings.api_router_mount_prefix
+    app.include_router(api_routes, prefix=mount)
+    logger.info("Mounted API routers under prefix %r", mount if mount else "")
 
     @app.get("/")
     async def root():

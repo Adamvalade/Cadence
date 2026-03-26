@@ -16,8 +16,14 @@ const HOP_BY_HOP = new Set([
 ]);
 
 function upstreamBase(): string {
-  const u = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-  return u.replace(/\/$/, "");
+  const explicit = (process.env.API_URL || "").trim().replace(/\/$/, "");
+  if (explicit) return explicit;
+  const pub = (process.env.NEXT_PUBLIC_API_URL || "").trim().replace(/\/$/, "");
+  // Browser uses https://site.com/api but the API container listens at /api on port 8000.
+  if (pub.endsWith("/api")) return "http://api:8000/api";
+  // Local dev: NEXT_PUBLIC=http://localhost:8000, or server can reach a public API URL directly.
+  if (pub.startsWith("http://") || pub.startsWith("https://")) return pub;
+  return "http://127.0.0.1:8000";
 }
 
 function forwardRequestHeaders(req: NextRequest): Headers {

@@ -44,7 +44,7 @@ You need things like `POSTGRES_PASSWORD`, `SECRET_KEY`, `FRONTEND_URL`, and `NEX
 
 **If the app suddenly 404s every API call:** check `NEXT_PUBLIC_API_URL`. If your reverse proxy serves the API under a path (e.g. `https://yoursite.com/api`), set that **full** value so the browser calls `https://yoursite.com/api/auth/...`. Same-origin fallback uses Next’s **`/internal-api/*`** proxy (not under `/api/*`, so naive `location /api/` rules don’t send those requests to FastAPI by mistake).
 
-**If `/api/auth/...` returns 404 but `/health` on the API container works:** the edge is probably forwarding the **full** path (still including `/api`) to FastAPI, while the app used to register only `/auth/...`. Set **`API_ROOT_PATH=/api`** in root `.env` (see `.env.example`), recreate **`api`** and **`web`**, so routes are served at `/api/auth/...` and the Next server uses `http://api:8000/api` internally.
+**If `/api/auth/...` returns 404 but `/health` on the API container works:** the edge is forwarding the full path (including `/api`) while FastAPI had no `/api` prefix. Root `.env` is loaded into the **api** container via Compose `env_file`; when **`NEXT_PUBLIC_API_URL`** ends with `.../api`, the API **auto-mounts** routers under `/api`. If your proxy **strips** `/api`, set **`API_FORCE_NO_PREFIX=true`** in `.env` instead.
 
 ### Demo mode (optional)
 

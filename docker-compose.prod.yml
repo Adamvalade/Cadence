@@ -31,6 +31,8 @@ services:
 
   api:
     restart: unless-stopped
+    env_file:
+      - .env
     build: ./api
     depends_on:
       db:
@@ -60,8 +62,6 @@ services:
       DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-}
       DEMO_LOGIN_AUTO_CREATE: ${DEMO_LOGIN_AUTO_CREATE:-true}
       DEMO_SEED_AT_STARTUP: ${DEMO_SEED_AT_STARTUP:-true}
-      # Set to /api if your edge forwards https://site.com/api/* here without stripping /api (see .env.example).
-      API_ROOT_PATH: ${API_ROOT_PATH:-}
     ports: ["8000:8000"]
     healthcheck:
       test:
@@ -83,8 +83,7 @@ services:
         # Omit from .env to show “Try demo” when enabled server-side; set to false to hide the button.
         NEXT_PUBLIC_DEMO_LOGIN: ${NEXT_PUBLIC_DEMO_LOGIN}
     environment:
-      # Internal base for server-side proxy; append API_ROOT_PATH when the API mounts under /api.
-      API_URL: http://api:8000${API_ROOT_PATH:-}
+      # Omit API_URL so Next infers http://api:8000 vs .../api from NEXT_PUBLIC_API_URL (see internal-api route).
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
       NEXT_PUBLIC_DEMO_LOGIN: ${NEXT_PUBLIC_DEMO_LOGIN}
     depends_on:

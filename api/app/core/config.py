@@ -44,10 +44,15 @@ class Settings(BaseSettings):
     # Empty = middleware disabled (e.g. Docker internal hostname varies).
     TRUSTED_HOSTS: str = ""
 
-    # When a reverse proxy forwards https://site.com/api/* to this app without stripping /api, set "/api"
-    # so routes live at /api/auth/..., /api/albums/..., etc. Leave empty when the proxy strips the prefix
-    # or when the API is mounted at the host root (e.g. api.example.com).
+    # Optional override for the URL prefix of all routers (e.g. "/api"). Usually leave unset: if
+    # NEXT_PUBLIC_API_URL ends with .../api, we mount at /api automatically (see api_router_mount_prefix).
     API_ROOT_PATH: str = ""
+
+    # Browser-visible API base (same value as web’s NEXT_PUBLIC_API_URL). Used in Docker to infer /api mount.
+    NEXT_PUBLIC_API_URL: str = ""
+
+    # If true, never infer /api from NEXT_PUBLIC_API_URL (use when the edge strips /api before the container).
+    API_FORCE_NO_PREFIX: bool = False
 
     # Optional error reporting (initialized in api/main.py before create_app).
     SENTRY_DSN: str = ""
@@ -71,6 +76,18 @@ class Settings(BaseSettings):
             return ""
         return s if s.startswith("/") else f"/{s}"
 
+    @field_validator("API_FORCE_NO_PREFIX", mode="before")
+    @classmethod
+    def _coerce_api_force_no_prefix(cls, v: object) -> bool:
+        if isinstance(v, bool):
+            return v
+        if v is None or v == "":
+            return False
+        s = str(v).strip().lower()
+        if s in ("0", "false", "no", "off", "n"):
+            return False
+        return s in ("1", "true", "yes", "on")
+
     @field_validator("DEMO_LOGIN_ENABLED", mode="before")
     @classmethod
     def _coerce_demo_login_enabled(cls, v: object) -> bool:
@@ -82,6 +99,19 @@ class Settings(BaseSettings):
         if s in ("0", "false", "no", "off", "n"):
             return False
         return s in ("1", "true", "yes", "on")
+
+    @property
+    def api_router_mount_prefix(self) -> str:
+        """Path prefix for all app routers (e.g. /api). /health and / stay at the app root."""
+        if self.API_FORCE_NO_PREFIX:
+            return ""
+        explicit = (self.API_ROOT_PATH or "").strip()
+        if explicit:
+            return self.API_ROOT_PATH
+        pub = (self.NEXT_PUBLIC_API_URL or "").strip().rstrip("/")
+        if pub.endswith("/api"):
+            return "/api"
+        return ""
 
     @property
     def demo_login_available(self) -> bool:
