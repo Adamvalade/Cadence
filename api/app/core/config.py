@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     # Empty = middleware disabled (e.g. Docker internal hostname varies).
     TRUSTED_HOSTS: str = ""
 
+    # When a reverse proxy forwards https://site.com/api/* to this app without stripping /api, set "/api"
+    # so routes live at /api/auth/..., /api/albums/..., etc. Leave empty when the proxy strips the prefix
+    # or when the API is mounted at the host root (e.g. api.example.com).
+    API_ROOT_PATH: str = ""
+
     # Optional error reporting (initialized in api/main.py before create_app).
     SENTRY_DSN: str = ""
     SENTRY_TRACES_SAMPLE_RATE: float = 0.0
@@ -55,6 +60,16 @@ class Settings(BaseSettings):
     DEMO_LOGIN_AUTO_CREATE: bool = True
     # When demo login is configured, seed fake friends + reviews at API startup (idempotent).
     DEMO_SEED_AT_STARTUP: bool = True
+
+    @field_validator("API_ROOT_PATH", mode="before")
+    @classmethod
+    def _normalize_api_root_path(cls, v: object) -> str:
+        if v is None or v == "":
+            return ""
+        s = str(v).strip().rstrip("/")
+        if not s:
+            return ""
+        return s if s.startswith("/") else f"/{s}"
 
     @field_validator("DEMO_LOGIN_ENABLED", mode="before")
     @classmethod

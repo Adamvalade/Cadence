@@ -1,7 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import APIRouter, FastAPI, Request
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -91,16 +91,20 @@ def create_app() -> FastAPI:
 
     from app.routers import auth, users, albums, reviews, follows, feed, lists, listen_status, discover, spotify_catalog
 
-    app.include_router(auth.router, prefix="/auth", tags=["auth"])
-    app.include_router(spotify_catalog.router, prefix="/spotify", tags=["spotify"])
-    app.include_router(users.router, prefix="/users", tags=["users"])
-    app.include_router(albums.router, prefix="/albums", tags=["albums"])
-    app.include_router(reviews.router, prefix="/reviews", tags=["reviews"])
-    app.include_router(follows.router, tags=["follows"])
-    app.include_router(feed.router, tags=["feed"])
-    app.include_router(lists.router, prefix="/lists", tags=["lists"])
-    app.include_router(listen_status.router, prefix="/listen-status", tags=["listen-status"])
-    app.include_router(discover.router, prefix="/discover", tags=["discover"])
+    api_routes = APIRouter()
+    api_routes.include_router(auth.router, prefix="/auth", tags=["auth"])
+    api_routes.include_router(spotify_catalog.router, prefix="/spotify", tags=["spotify"])
+    api_routes.include_router(users.router, prefix="/users", tags=["users"])
+    api_routes.include_router(albums.router, prefix="/albums", tags=["albums"])
+    api_routes.include_router(reviews.router, prefix="/reviews", tags=["reviews"])
+    api_routes.include_router(follows.router, tags=["follows"])
+    api_routes.include_router(feed.router, tags=["feed"])
+    api_routes.include_router(lists.router, prefix="/lists", tags=["lists"])
+    api_routes.include_router(listen_status.router, prefix="/listen-status", tags=["listen-status"])
+    api_routes.include_router(discover.router, prefix="/discover", tags=["discover"])
+
+    root = settings.API_ROOT_PATH
+    app.include_router(api_routes, prefix=root)
 
     @app.get("/")
     async def root():
