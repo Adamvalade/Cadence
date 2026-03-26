@@ -10,7 +10,7 @@ import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -385,7 +385,15 @@ async def personalize_demo_account(db: AsyncSession, demo_user: User) -> None:
     if not settings.demo_login_available:
         return
 
-    await seed_demo_public_dataset(db)
+    # Public dataset is seeded at API startup when DEMO_SEED_AT_STARTUP is on (default). Re-running it
+    # here on every demo login was correct but very slow (hundreds of idempotent DB ops).
+    if not settings.demo_seed_at_startup_enabled:
+        await seed_demo_public_dataset(db)
+
+    fc = await db.execute(select(func.count()).where(Follow.follower_id == demo_user.id))
+    if (fc.scalar() or 0) >= len(_BOTS):
+        logger.debug("Demo user already personalized (follows in place); skipping")
+        return
 
     bot_users: list[User] = []
     for username, _, email, _ in _BOTS:
