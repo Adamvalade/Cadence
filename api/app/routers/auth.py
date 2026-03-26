@@ -27,7 +27,7 @@ from app.schemas.auth import (
     ResetPasswordRequest,
     UserBrief,
 )
-from app.services.demo_seed import personalize_demo_account
+from app.services.demo_seed import get_or_create_demo_user, personalize_demo_account
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -170,37 +170,21 @@ async def demo_login(request: Request, response: Response, db: AsyncSession = De
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     auth_limiter.check(request)
 
-    email = settings.DEMO_USER_EMAIL.strip()
     password = settings.DEMO_USER_PASSWORD.strip()
-    result = await db.execute(select(User).where(User.email == email))
-    user = result.scalar_one_or_none()
-
+    user = await get_or_create_demo_user(db)
     if not user:
-        if not settings.DEMO_LOGIN_AUTO_CREATE:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Demo account is not provisioned",
-            )
-        username = "demo"
-        taken = await db.execute(select(User).where(User.username == username))
-        if taken.scalar_one_or_none():
-            username = f"demo_{secrets.token_hex(3)}"
-        user = User(
-            email=email,
-            username=username,
-            password_hash=hash_password(password),
-            display_name="Jamie Demo",
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Demo account is not provisioned",
         )
-        db.add(user)
-        await db.flush()
-        await db.refresh(user)
-    elif not user.password_hash or not verify_password(password, user.password_hash):
+    if not user.password_hash or not verify_password(password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Demo login misconfigured or password changed for this account",
         )
 
-    await personalize_demo_account(db, user)
+    if not settings.demo_seed_at_startup_enabled:
+        await personalize_demo_account(db, user)
     await db.commit()
     await db.refresh(user)
 

@@ -20,10 +20,11 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     if settings.demo_seed_at_startup_enabled:
         try:
-            from app.services.demo_seed import seed_demo_public_dataset
+            from app.services.demo_seed import seed_demo_public_dataset, warmup_demo_user_at_startup
 
             async with async_session() as session:
                 await seed_demo_public_dataset(session)
+                await warmup_demo_user_at_startup(session)
                 await session.commit()
         except Exception:
             logger.exception("Demo dataset seed at startup failed")

@@ -401,9 +401,6 @@ async def personalize_demo_account(db: AsyncSession, demo_user: User) -> None:
             continue
         await _get_or_create_review(db, demo_user.id, album.id, rating, body, days_ago)
 
-    for sid in album_by_sid:
-        await _ensure_tracks_for_album(db, album_by_sid[sid])
-
     for sid, track_i, rating in _DEMO_USER_TRACK_RATINGS:
         album = album_by_sid.get(sid)
         if not album:
@@ -428,3 +425,39 @@ async def personalize_demo_account(db: AsyncSession, demo_user: User) -> None:
             await _ensure_like(db, demo_user.id, rev.id)
 
     logger.info("Personalized demo account user_id=%s", demo_user.id)
+
+
+async def get_or_create_demo_user(db: AsyncSession) -> User | None:
+    if not settings.demo_login_available:
+        return None
+    email = settings.DEMO_USER_EMAIL.strip()
+    password = settings.DEMO_USER_PASSWORD.strip()
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if user:
+        return user
+    if not settings.DEMO_LOGIN_AUTO_CREATE:
+        return None
+    username = "demo"
+    taken = await db.execute(select(User).where(User.username == username))
+    if taken.scalar_one_or_none():
+        username = f"demo_{secrets.token_hex(3)}"
+    user = User(
+        email=email,
+        username=username,
+        password_hash=hash_password(password),
+        display_name="Jamie Demo",
+    )
+    db.add(user)
+    await db.flush()
+    await db.refresh(user)
+    return user
+
+
+async def warmup_demo_user_at_startup(db: AsyncSession) -> None:
+    if not settings.demo_seed_at_startup_enabled:
+        return
+    user = await get_or_create_demo_user(db)
+    if not user:
+        return
+    await personalize_demo_account(db, user)
