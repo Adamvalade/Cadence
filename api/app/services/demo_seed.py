@@ -23,6 +23,12 @@ from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
+
+def _utc_naive_now() -> datetime:
+    """UTC wall time as naive datetime — matches Postgres TIMESTAMP WITHOUT TIME ZONE + asyncpg."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 # Synthetic Spotify IDs — never collide with real imports if you use the same prefix consistently.
 _ALBUMS: tuple[tuple[str, str, str, int, str, str | None], ...] = (
     ("cadence-demo-001", "Random Access Memories", "Daft Punk", 2013, "https://picsum.photos/seed/cadence1/300/300", "Electronic"),
@@ -104,7 +110,7 @@ async def _get_or_create_review(
     r = await db.execute(select(Review).where(Review.user_id == user_id, Review.album_id == album_id))
     if r.scalar_one_or_none():
         return None
-    when = datetime.now(timezone.utc) - timedelta(days=days_ago)
+    when = _utc_naive_now() - timedelta(days=days_ago)
     rev = Review(
         user_id=user_id,
         album_id=album_id,
@@ -197,7 +203,7 @@ async def personalize_demo_account(db: AsyncSession, demo_user: User) -> None:
     if album:
         r = await db.execute(select(Review).where(Review.user_id == demo_user.id, Review.album_id == album.id))
         if not r.scalar_one_or_none():
-            when = datetime.now(timezone.utc) - timedelta(hours=6)
+            when = _utc_naive_now() - timedelta(hours=6)
             db.add(
                 Review(
                     user_id=demo_user.id,
