@@ -19,6 +19,12 @@ function resolveApiBase(): string {
   try {
     const cfgUrl = new URL(configured);
     if (cfgUrl.origin === window.location.origin) {
+      // e.g. https://site.com/api — reverse proxy sends /api/* to FastAPI; call that directly (no /auth collision).
+      const pathPrefix = (cfgUrl.pathname || "/").replace(/\/$/, "");
+      if (pathPrefix && pathPrefix !== "/") {
+        return `${cfgUrl.origin}${pathPrefix}`.replace(/\/$/, "");
+      }
+      // Same host, API at origin root — must use Next proxy so /auth/* doesn't hit Next.js pages.
       return `${window.location.origin}/api/upstream`;
     }
     // Production site on HTTPS but image was built with localhost API URL — browser can't reach that.
