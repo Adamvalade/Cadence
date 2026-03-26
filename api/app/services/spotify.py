@@ -7,12 +7,10 @@ from spotipy.oauth2 import SpotifyClientCredentials
 from app.core.config import settings
 from app.schemas.album import AlbumSearchResult
 
-# Spotify GET /search: limit max 10 per item type (Web API reference, not Spotipy default).
 _SPOTIFY_SEARCH_LIMIT_MAX = 10
 
 
 def _resolve_spotify_track_id(item: dict) -> str | None:
-    """Album track items often omit `id` or put the real id under `linked_from` (market / linking)."""
     tid = item.get("id")
     if isinstance(tid, str) and tid.strip():
         return tid.strip()
@@ -28,8 +26,7 @@ def _resolve_spotify_track_id(item: dict) -> str | None:
             return parts[2]
     return None
 
-# One client + in-memory token cache: avoids concurrent .cache file corruption when
-# many requests each did SpotifyService() + default CacheFileHandler (same .cache path).
+
 _init_lock = threading.Lock()
 _spotify: spotipy.Spotify | None = None
 

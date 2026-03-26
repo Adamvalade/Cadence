@@ -30,8 +30,6 @@ export default function LoginPage() {
         if (!cancelled) setDemoOffered(r.enabled);
       })
       .catch(() => {
-        // Still show the button: server may have demo on but status check failed (stale build, proxy, etc.).
-        // demo-login returns a clear error if demo is off.
         if (!cancelled) setDemoOffered(true);
       });
     return () => {

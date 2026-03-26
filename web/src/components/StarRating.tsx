@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils";
 import { formatAverageRatingLabel, formatStoredRatingLabel, starScoreForDisplay } from "@/lib/ratingDisplay";
 
 interface StarRatingProps {
-  /** API scale 1–10 (half-star steps); 0 = none (interactive only). Averages may be fractional. */
   value: number;
   onChange?: (value: number) => void;
   size?: "sm" | "md" | "lg";

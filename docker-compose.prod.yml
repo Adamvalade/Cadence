@@ -1,9 +1,4 @@
-# Optional merge files (from repo root): deploy/docker-compose.caddy.yml, deploy/docker-compose.secrets.yml,
-# deploy/docker-compose.backup.yml — see deploy/README.md
-#
-# Environment variables: put them in a file named `.env` in THIS directory (repo root),
-# next to this compose file. Run:  cp .env.example .env  then edit `.env`.
-# Docker Compose loads root `.env` automatically for ${VAR} substitution — not api/.env.
+# Merge: deploy/docker-compose.caddy.yml, deploy/docker-compose.secrets.yml, deploy/docker-compose.backup.yml (deploy/README.md)
 
 services:
   db:
@@ -53,7 +48,6 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       ENVIRONMENT: ${ENVIRONMENT:-production}
-      # Optional: comma-separated API hostnames for TrustedHostMiddleware (e.g. api.example.com)
       TRUSTED_HOSTS: ${TRUSTED_HOSTS:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
       SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0}
@@ -80,10 +74,8 @@ services:
       context: ./web
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-        # Omit from .env to show “Try demo” when enabled server-side; set to false to hide the button.
         NEXT_PUBLIC_DEMO_LOGIN: ${NEXT_PUBLIC_DEMO_LOGIN}
     environment:
-      # Omit API_URL so Next infers http://api:8000 vs .../api from NEXT_PUBLIC_API_URL (see internal-api route).
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
       NEXT_PUBLIC_DEMO_LOGIN: ${NEXT_PUBLIC_DEMO_LOGIN}
     depends_on:

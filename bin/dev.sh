@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Start Postgres/Redis + API + Next.js so the app is available on localhost.
-# Run ./bin/setup.sh once first if you have no venv or node_modules.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -47,8 +45,6 @@ else
   API_URL_MSG="http://localhost:8000"
 fi
 
-# Next uses https:// API URL but uvicorn has no TLS → every fetch sends TLS to a plain-HTTP socket →
-# uvicorn floods "Invalid HTTP request received" and the app breaks.
 if [[ -f "$WEB_DIR/.env.local" ]] && grep -qE '^[[:space:]]*NEXT_PUBLIC_API_URL=https://' "$WEB_DIR/.env.local" 2>/dev/null; then
   if [[ ! -f "$SSL_CERT" || ! -f "$SSL_KEY" ]]; then
     echo ""

@@ -16,7 +16,6 @@ export default function RatingDistribution({
   });
   const total = entries.reduce((s, e) => s + e.count, 0);
   const max = Math.max(...entries.map((e) => e.count), 1);
-  /** Pixel height — avoids broken % heights inside flex columns without a fixed track. */
   const maxBarPx = 80;
 
   return (

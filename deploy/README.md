@@ -1,8 +1,8 @@
 # Production operations
 
-Compose files here **merge** with `docker-compose.prod.yml` from the repo root. Always run commands from the **repository root**.
+Compose files here **merge** with `docker-compose.prod.yml` from the repo root. Run compose from the **repository root**.
 
-**Env vars for compose:** put them in **`.env` in the repo root** (copy from **`.env.example`** there). Compose reads that file automatically; **`api/.env` is not used** by `docker-compose.prod.yml`.
+**Env:** repo root **`.env`** (from **`.env.example`**). `docker-compose.prod.yml` does not load **`api/.env`**.
 
 ## HTTPS at the edge (Caddy + Let’s Encrypt)
 

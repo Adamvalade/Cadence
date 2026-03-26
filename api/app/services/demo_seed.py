@@ -1,7 +1,4 @@
-"""
-Idempotent demo dataset: fake users, albums, reviews, likes, follows, and track ratings for recruiter demos.
-Runs at API startup when demo login is configured; extends graph when the demo account logs in.
-"""
+"""Optional demo dataset: seeded users, albums, reviews, track ratings, likes, follows (idempotent)."""
 
 from __future__ import annotations
 
@@ -27,11 +24,9 @@ logger = logging.getLogger(__name__)
 
 
 def _utc_naive_now() -> datetime:
-    """UTC wall time as naive datetime — matches Postgres TIMESTAMP WITHOUT TIME ZONE + asyncpg."""
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
-# Synthetic Spotify IDs — never collide with real imports if you use the same prefix consistently.
 _ALBUMS: tuple[tuple[str, str, str, int, str, str | None], ...] = (
     ("cadence-demo-001", "Random Access Memories", "Daft Punk", 2013, "https://picsum.photos/seed/cadence1/300/300", "Electronic"),
     ("cadence-demo-002", "To Pimp a Butterfly", "Kendrick Lamar", 2015, "https://picsum.photos/seed/cadence2/300/300", "Hip-Hop"),
@@ -63,7 +58,7 @@ _BOTS: tuple[tuple[str, str, str, str], ...] = (
     ("alex_tapes", "Alex Kim", "alex@bots.cadence.demo", "alex"),
 )
 
-# username, album spotify_id, rating (1–10), body, days_ago — wide rating spread (UI shows ÷2 as /5 stars)
+# username, album_sid, rating 1–10, body, days_ago
 _REVIEWS: tuple[tuple[str, str, int, str, int], ...] = (
     ("nina_vinyl", "cadence-demo-001", 9, "Finally sat with this front to back—still feels futuristic.", 1),
     ("nina_vinyl", "cadence-demo-003", 7, "Perfect late-night listen. A few tracks are instant repeats.", 3),
@@ -98,7 +93,6 @@ _REVIEW_SNIPPETS_EXTRA = (
     "Perfect background until track 4 hits.",
 )
 
-# Hand-plausible track titles for the first six marquee albums (4 tracks each)
 _TRACK_OVERRIDES: dict[str, tuple[str, str, str, str]] = {
     "cadence-demo-001": ("Give Life Back to Music", "Giorgio by Moroder", "Instant Crush", "Contact"),
     "cadence-demo-002": ("Wesley’s Theory", "Alright", "The Blacker the Berry", "Mortal Man"),
@@ -247,7 +241,6 @@ async def _seed_cross_album_bot_reviews(
     bots: dict[str, User],
     album_by_sid: dict[str, Album],
 ) -> None:
-    """Extra bot reviews on albums 007–020 so Discover trending fills out with varied scores."""
     extra_sids = tuple(s for s in album_by_sid if s >= "cadence-demo-007")
     rating_cycle = (10, 4, 8, 6, 9, 5, 7, 10, 3, 8, 6, 9, 7, 5, 10, 4, 8, 6)
     n = 0
@@ -270,12 +263,10 @@ async def _seed_bot_track_ratings(
     bots: dict[str, User],
     album_by_sid: dict[str, Album],
 ) -> None:
-    """Per-track ratings so review cards show varied song-score averages (1–10 scale)."""
     tracks_by_sid: dict[str, list[Track]] = {}
     for sid, album in album_by_sid.items():
         tracks_by_sid[sid] = await _ensure_tracks_for_album(db, album)
 
-    # Two tracks per bot per album, rotating ratings across 3–10
     rating_pattern = (10, 5, 8, 4, 9, 6, 10, 7, 3, 9, 8, 5, 10, 6, 7, 8, 4, 10, 6, 9)
     n = 0
     for username in bots:
@@ -284,14 +275,13 @@ async def _seed_bot_track_ratings(
             tlist = tracks_by_sid.get(sid) or []
             if len(tlist) < 4:
                 continue
-            for ti in (0, 2):  # first and third track — leaves headroom for demo user on others
+            for ti in (0, 2):
                 r = rating_pattern[n % len(rating_pattern)]
                 n += 1
                 await _ensure_track_rating(db, bot.id, tlist[ti].id, r)
 
 
 async def seed_demo_public_dataset(db: AsyncSession) -> None:
-    """Bots, albums, tracks, reviews, track ratings, and cross-likes so Discover / Social look alive."""
     if not settings.demo_login_available:
         return
 
@@ -335,7 +325,6 @@ async def seed_demo_public_dataset(db: AsyncSession) -> None:
     )
 
 
-# Demo user: many album reviews + track ratings (idempotent)
 _DEMO_USER_ALBUM_REVIEWS: tuple[tuple[str, int, str, int], ...] = (
     ("cadence-demo-001", 8, "Daft Punk phase I didn’t expect to revisit this hard.", 2),
     ("cadence-demo-002", 10, "Still unpacking lines—saved half the album.", 4),
@@ -352,7 +341,6 @@ _DEMO_USER_ALBUM_REVIEWS: tuple[tuple[str, int, str, int], ...] = (
     ("cadence-demo-020", 8, "Sparse and devastating; can’t rush it.", 13),
 )
 
-# (album_sid, track_index 1–4, rating 1–10)
 _DEMO_USER_TRACK_RATINGS: tuple[tuple[str, int, int], ...] = (
     ("cadence-demo-001", 1, 10),
     ("cadence-demo-001", 3, 9),
@@ -381,12 +369,9 @@ _DEMO_USER_TRACK_RATINGS: tuple[tuple[str, int, int], ...] = (
 
 
 async def personalize_demo_account(db: AsyncSession, demo_user: User) -> None:
-    """Follow bot friends, many reviews + track ratings, likes so feed and profile feel real."""
     if not settings.demo_login_available:
         return
 
-    # Public dataset is seeded at API startup when DEMO_SEED_AT_STARTUP is on (default). Re-running it
-    # here on every demo login was correct but very slow (hundreds of idempotent DB ops).
     if not settings.demo_seed_at_startup_enabled:
         await seed_demo_public_dataset(db)
 

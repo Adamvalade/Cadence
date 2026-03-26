@@ -3,7 +3,6 @@ from urllib.parse import urlparse
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
-# Reject these in production (see validate_production_settings).
 WEAK_SECRET_KEYS = frozenset(
     {
         "change-me",
@@ -22,12 +21,9 @@ class Settings(BaseSettings):
 
     SPOTIFY_CLIENT_ID: str = ""
     SPOTIFY_CLIENT_SECRET: str = ""
-    # Loaded for env/Compose parity with Spotify dashboard; album search uses client credentials only.
     SPOTIFY_REDIRECT_URI: str = ""
-    # ISO 3166-1 alpha-2; client-credentials search/catalog calls need a market
     SPOTIFY_MARKET: str = "US"
 
-    # Password reset emails via https://resend.com (optional; without these, link is only logged in dev)
     RESEND_API_KEY: str = ""
     EMAIL_FROM: str = ""
 
@@ -40,30 +36,19 @@ class Settings(BaseSettings):
     DB_POOL_SIZE: int = 10
     DB_MAX_OVERFLOW: int = 20
 
-    # Comma-separated hostnames for TrustedHostMiddleware in production (e.g. "api.example.com").
-    # Empty = middleware disabled (e.g. Docker internal hostname varies).
     TRUSTED_HOSTS: str = ""
 
-    # Optional override for the URL prefix of all routers (e.g. "/api"). Usually leave unset: if
-    # NEXT_PUBLIC_API_URL ends with .../api, we mount at /api automatically (see api_router_mount_prefix).
     API_ROOT_PATH: str = ""
-
-    # Browser-visible API base (same value as web’s NEXT_PUBLIC_API_URL). Used in Docker to infer /api mount.
     NEXT_PUBLIC_API_URL: str = ""
-
-    # If true, never infer /api from NEXT_PUBLIC_API_URL (use when the edge strips /api before the container).
     API_FORCE_NO_PREFIX: bool = False
 
-    # Optional error reporting (initialized in api/main.py before create_app).
     SENTRY_DSN: str = ""
     SENTRY_TRACES_SAMPLE_RATE: float = 0.0
 
-    # Demo account: POST /auth/demo-login (404 when disabled). Use a dedicated email; min 8-char password.
     DEMO_LOGIN_ENABLED: bool = False
     DEMO_USER_EMAIL: str = "demo@cadence.local"
     DEMO_USER_PASSWORD: str = ""
     DEMO_LOGIN_AUTO_CREATE: bool = True
-    # When demo login is configured, seed fake friends + reviews at API startup (idempotent).
     DEMO_SEED_AT_STARTUP: bool = True
 
     @field_validator("API_ROOT_PATH", mode="before")
@@ -102,7 +87,6 @@ class Settings(BaseSettings):
 
     @property
     def api_router_mount_prefix(self) -> str:
-        """Path prefix for all app routers (e.g. /api). /health and / stay at the app root."""
         if self.API_FORCE_NO_PREFIX:
             return ""
         explicit = (self.API_ROOT_PATH or "").strip()
@@ -131,18 +115,14 @@ class Settings(BaseSettings):
 
     @property
     def access_token_cookie_samesite(self) -> str:
-        # SameSite=None requires Secure; only use in production over HTTPS.
         return "lax"
 
     @property
     def access_token_cookie_secure(self) -> bool:
-        # Browsers ignore Secure cookies set over plain HTTP — dev APIs are usually http://,
-        # so forcing Secure=True breaks session cookies entirely while JSON login still "works".
         return self.is_production
 
     @property
     def cors_allow_origins(self) -> list[str]:
-        """Origins allowed for credentialed CORS (must list exact browser origins)."""
         primary = self.FRONTEND_URL.rstrip("/")
         if self.is_production:
             return [primary]
@@ -170,23 +150,18 @@ settings = Settings()
 
 
 def assert_safe_for_production(*, environment: str, secret_key: str, frontend_url: str) -> None:
-    """Fail fast on unsafe defaults when environment is production (testable without env reload)."""
     if environment != "production":
         return
     sk = secret_key.strip()
     if sk in WEAK_SECRET_KEYS or len(sk) < MIN_PRODUCTION_SECRET_KEY_LEN:
         raise RuntimeError(
-            "Production requires SECRET_KEY: at least 32 characters and not a known placeholder. "
-            'Generate one with: python -c "import secrets; print(secrets.token_urlsafe(48))"'
+            "Production SECRET_KEY must be at least 32 characters and not a known placeholder."
         )
     front = frontend_url.lower().strip().rstrip("/")
     if front.startswith("http://") and not (
         front.startswith("http://localhost") or front.startswith("http://127.0.0.1")
     ):
-        raise RuntimeError(
-            "Production FRONTEND_URL must use https:// except for http://localhost or http://127.0.0.1 "
-            "(local smoke tests)."
-        )
+        raise RuntimeError("Production FRONTEND_URL must use https:// (except localhost / 127.0.0.1).")
 
 
 def validate_production_settings() -> None:

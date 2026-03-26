@@ -2,7 +2,7 @@
 
 Cadence is a small full-stack app for logging albums you’ve listened to, writing short reviews, and seeing what people you follow are into. There’s search (with Spotify as a catalog source), a home feed from followed users, and pages for profiles, albums, and lists.
 
-If you’re reviewing this repo: clone it, skim `web/src/app` and `api/app/routers`, or hit a deployed instance and use **Try demo** on the login screen when that’s enabled—you’ll land in a pre-seeded account with fake friends and reviews so the UI isn’t empty.
+**Try demo** on the login page (when enabled) opens a pre-seeded account. Main code: `web/src/app`, `api/app/routers`.
 
 ---
 
@@ -34,7 +34,7 @@ web/src/     app routes, components, API client
 From the **repo root** (where `docker-compose.prod.yml` lives):
 
 ```bash
-cp .env.example .env   # if you don’t have one yet
+cp .env.example .env
 docker compose -f docker-compose.prod.yml up --build -d
 ```
 
@@ -42,9 +42,7 @@ Compose reads **`.env` in that root folder**—not `api/.env`. (`api/.env` is fo
 
 You need things like `POSTGRES_PASSWORD`, `SECRET_KEY`, `FRONTEND_URL`, and `NEXT_PUBLIC_API_URL` (public URLs your browser actually uses). More detail: [deploy/README.md](deploy/README.md).
 
-**If the app suddenly 404s every API call:** check `NEXT_PUBLIC_API_URL`. If your reverse proxy serves the API under a path (e.g. `https://yoursite.com/api`), set that **full** value so the browser calls `https://yoursite.com/api/auth/...`. Same-origin fallback uses Next’s **`/internal-api/*`** proxy (not under `/api/*`, so naive `location /api/` rules don’t send those requests to FastAPI by mistake).
-
-**If `/api/auth/...` returns 404 but `/health` on the API container works:** the edge is forwarding the full path (including `/api`) while FastAPI had no `/api` prefix. Root `.env` is loaded into the **api** container via Compose `env_file`; when **`NEXT_PUBLIC_API_URL`** ends with `.../api`, the API **auto-mounts** routers under `/api`. If your proxy **strips** `/api`, set **`API_FORCE_NO_PREFIX=true`** in `.env` instead.
+**API 404s from the browser:** `NEXT_PUBLIC_API_URL` must match how traffic reaches the API (path vs subdomain). Same-origin setups use Next’s `/internal-api/*` BFF so `/api/*` nginx rules don’t hit FastAPI by mistake. **404 on `/api/auth/...` with healthy `/health`:** often full path still has `/api` at the app; the API infers a `/api` mount from `NEXT_PUBLIC_API_URL` when it ends with `/api`, or set `API_FORCE_NO_PREFIX=true` if the proxy strips `/api`.
 
 ### Demo mode (optional)
 
@@ -55,9 +53,7 @@ DEMO_LOGIN_ENABLED=true
 DEMO_USER_PASSWORD=some-password-at-least-8-characters
 ```
 
-(You can keep `DEMO_USER_EMAIL`, `DEMO_LOGIN_AUTO_CREATE`, and `DEMO_SEED_AT_STARTUP` as in `.env.example`; defaults are fine.)
-
-**What `DEMO_USER_PASSWORD` is:** It’s the password for the **single shared demo user** on your server. You choose it and put it only in `.env`. Recruiters **do not** type it—the **Try demo** button calls the API, which logs them into that account using the value from the server config. So it’s not “their” password; it’s the demo account’s password, and you should assume anyone with access to your env or repo secrets could see it. Don’t reuse a real personal password. After changing it, if the demo user already existed with an old hash, you’d need to fix or delete that user in the DB once—first-time deploys usually don’t hit that.
+`DEMO_USER_PASSWORD` is the shared demo account password (server-side only; **Try demo** logs in without visitors typing it). Use a dedicated value, not a personal password.
 
 ---
 
@@ -69,4 +65,4 @@ DEMO_USER_PASSWORD=some-password-at-least-8-characters
 
 ### Alembic “already exists”
 
-DB has tables but Alembic’s version is wrong. See `./bin/setup.sh` stamping logic, or stamp the revision named in the error then `alembic upgrade head` again—don’t `stamp head` unless you’re sure every migration already ran.
+DB exists but Alembic version is wrong: align version with `./bin/setup.sh` / stamp + `alembic upgrade head` per the error output.

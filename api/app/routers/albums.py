@@ -127,8 +127,6 @@ async def get_album_tracks(
     db: AsyncSession = Depends(get_db),
     current_user: User | None = Depends(get_optional_user),
 ):
-    # Capture before any commit() — commits expire ORM instances; accessing current_user.id later can
-    # trigger a sync lazy load and raise MissingGreenlet in async SQLAlchemy.
     viewer_id: uuid.UUID | None = current_user.id if current_user else None
 
     aid = uuid.UUID(album_id)

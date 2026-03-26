@@ -1,13 +1,7 @@
 import { readAccessToken } from "./sessionToken";
 
-/** Next.js BFF proxy path — not under `/api/*` so host nginx “location /api/ → backend” rules don’t steal it. */
 const BROWSER_API_PROXY = "/internal-api";
 
-/**
- * When NEXT_PUBLIC_API_URL matches the site origin (e.g. both https://cadencemusik.com),
- * calling /auth/register would hit the Next.js page route instead of the API. Use the
- * server proxy in that case. Otherwise call the API host directly (e.g. api subdomain).
- */
 function resolveApiBase(): string {
   if (typeof window === "undefined") {
     const internal = (process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "").trim();
@@ -22,15 +16,12 @@ function resolveApiBase(): string {
   try {
     const cfgUrl = new URL(configured);
     if (cfgUrl.origin === window.location.origin) {
-      // e.g. https://site.com/api — reverse proxy sends /api/* to FastAPI; call that directly (no /auth collision).
       const pathPrefix = (cfgUrl.pathname || "/").replace(/\/$/, "");
       if (pathPrefix && pathPrefix !== "/") {
         return `${cfgUrl.origin}${pathPrefix}`.replace(/\/$/, "");
       }
-      // Same host, API at origin root — must use Next proxy so /auth/* doesn't hit Next.js pages.
       return `${window.location.origin}${BROWSER_API_PROXY}`;
     }
-    // Production site on HTTPS but image was built with localhost API URL — browser can't reach that.
     if (window.location.protocol === "https:" && (cfgUrl.hostname === "localhost" || cfgUrl.hostname === "127.0.0.1")) {
       return `${window.location.origin}${BROWSER_API_PROXY}`;
     }

@@ -1,13 +1,4 @@
-# Daily pg_dump of the cadence database to ./data/pg-backups (merge with prod compose).
-#
-#   mkdir -p data/pg-backups
-#   docker compose -f docker-compose.prod.yml -f deploy/docker-compose.backup.yml up -d
-#
-# Uses POSTGRES_PASSWORD from your .env (same as docker-compose.prod.yml). If you only use
-# deploy/docker-compose.secrets.yml for Postgres, set POSTGRES_PASSWORD in .env for this service
-# or run manual dumps (see deploy/README.md).
-#
-# First backup runs immediately; then every 24h. Deletes local .gz backups older than 14 days.
+# Optional pg_dump → ./data/pg-backups. Merge with prod compose; details in deploy/README.md.
 
 services:
   pg-backup:

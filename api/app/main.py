@@ -58,7 +58,6 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception):
-        """Return JSON (with CORS) instead of letting Starlette emit a bare 500 without CORS headers."""
         if isinstance(exc, StarletteHTTPException):
             return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
         if isinstance(exc, RequestValidationError):
