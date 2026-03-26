@@ -1,5 +1,8 @@
 import { readAccessToken } from "./sessionToken";
 
+/** Next.js BFF proxy path — not under `/api/*` so host nginx “location /api/ → backend” rules don’t steal it. */
+const BROWSER_API_PROXY = "/internal-api";
+
 /**
  * When NEXT_PUBLIC_API_URL matches the site origin (e.g. both https://cadencemusik.com),
  * calling /auth/register would hit the Next.js page route instead of the API. Use the
@@ -14,7 +17,7 @@ function resolveApiBase(): string {
 
   const configured = (process.env.NEXT_PUBLIC_API_URL || "").trim().replace(/\/$/, "");
   if (!configured) {
-    return `${window.location.origin}/api/upstream`;
+    return `${window.location.origin}${BROWSER_API_PROXY}`;
   }
   try {
     const cfgUrl = new URL(configured);
@@ -25,11 +28,11 @@ function resolveApiBase(): string {
         return `${cfgUrl.origin}${pathPrefix}`.replace(/\/$/, "");
       }
       // Same host, API at origin root — must use Next proxy so /auth/* doesn't hit Next.js pages.
-      return `${window.location.origin}/api/upstream`;
+      return `${window.location.origin}${BROWSER_API_PROXY}`;
     }
     // Production site on HTTPS but image was built with localhost API URL — browser can't reach that.
     if (window.location.protocol === "https:" && (cfgUrl.hostname === "localhost" || cfgUrl.hostname === "127.0.0.1")) {
-      return `${window.location.origin}/api/upstream`;
+      return `${window.location.origin}${BROWSER_API_PROXY}`;
     }
   } catch {
     return configured;

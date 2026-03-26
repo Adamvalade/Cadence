@@ -42,7 +42,7 @@ Compose reads **`.env` in that root folder**—not `api/.env`. (`api/.env` is fo
 
 You need things like `POSTGRES_PASSWORD`, `SECRET_KEY`, `FRONTEND_URL`, and `NEXT_PUBLIC_API_URL` (public URLs your browser actually uses). More detail: [deploy/README.md](deploy/README.md).
 
-**If the app suddenly 404s every API call:** check `NEXT_PUBLIC_API_URL`. If your reverse proxy serves the API under a path (e.g. `https://yoursite.com/api`), set that **full** value. The browser must call `https://yoursite.com/api/auth/...`, not `https://yoursite.com/api/upstream/...` (that path only exists inside Next and breaks when `/api` is routed straight to FastAPI).
+**If the app suddenly 404s every API call:** check `NEXT_PUBLIC_API_URL`. If your reverse proxy serves the API under a path (e.g. `https://yoursite.com/api`), set that **full** value so the browser calls `https://yoursite.com/api/auth/...`. Same-origin fallback uses Next’s **`/internal-api/*`** proxy (not under `/api/*`, so naive `location /api/` rules don’t send those requests to FastAPI by mistake).
 
 ### Demo mode (optional)
 
